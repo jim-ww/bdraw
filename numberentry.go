@@ -6,18 +6,56 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	zone "github.com/lrstanley/bubblezone/v2"
 )
 
 // Shared click-to-type-a-number component, used by both the size and zoom
 // toolbar controls: click the value to start typing, digits and a single
 // '.' are accepted (no minus sign — negative brush size or zoom is
 // meaningless), enter confirms and clamps into range, esc cancels leaving
-// the old value untouched.
+// the old value untouched. Left/right arrows nudge it, and the slider shown
+// below can be clicked anywhere along its length to jump straight there.
 
 func (m *Model) startNumberEntry(target string, current float64) {
 	m.mode = modeNumberEntry
 	m.numEntryTarget = target
 	m.numEntryValue = strconv.FormatFloat(current, 'f', -1, 64)
+}
+
+// numberEntryRange returns the valid range and display label for the
+// number currently being entered.
+func (m Model) numberEntryRange() (lo, hi float64, label string, ok bool) {
+	switch m.numEntryTarget {
+	case "size":
+		return sizeMin, sizeMax, "size", true
+	case "zoom":
+		return zoomMin * 100, zoomMax * 100, "zoom", true
+	default:
+		return 0, 0, "", false
+	}
+}
+
+// applyNumberEntryValue commits a value for the current target immediately
+// (used by the slider and arrow keys, which are meant to preview live,
+// unlike typed digits which wait for Enter).
+func (m *Model) applyNumberEntryValue(v float64) {
+	var applied float64
+	switch m.numEntryTarget {
+	case "size":
+		m.setSize(v)
+		applied = m.size
+	case "zoom":
+		zoom := m.doc().Zoom
+		if zoom == 0 {
+			zoom = 1
+		}
+		m.zoomAtCursor(v / 100 / zoom)
+		applied = m.doc().Zoom * 100
+	}
+	// Reflect what actually got applied (setSize/zoomAtCursor round and
+	// clamp), not the raw slider/arrow-key math, so the live label never
+	// shows more precision than the value it's tracking actually has.
+	m.numEntryValue = strconv.FormatFloat(applied, 'f', -1, 64)
 }
 
 func (m Model) handleNumberEntryKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -45,6 +83,30 @@ func (m Model) handleNumberEntryKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.numEntryValue = m.numEntryValue[:n-1]
 		}
 		return m, nil
+
+	case "left", "right":
+		lo, hi, _, ok := m.numberEntryRange()
+		if !ok {
+			return m, nil
+		}
+		v, err := strconv.ParseFloat(m.numEntryValue, 64)
+		if err != nil {
+			v = lo
+		}
+		step := math.Pow(hi/lo, 1.0/float64(sliderWidth))
+		if msg.String() == "left" {
+			v /= step
+		} else {
+			v *= step
+		}
+		if v < lo {
+			v = lo
+		}
+		if v > hi {
+			v = hi
+		}
+		m.applyNumberEntryValue(v)
+		return m, nil
 	}
 
 	s := msg.String()
@@ -67,20 +129,28 @@ func (m Model) numberEntryLabel(target, suffix string, current float64) string {
 
 const sliderWidth = 30
 
+// sliderValueAt maps a click's x offset within the slider bar (0-based,
+// inside the brackets) to a value on the log-scale range.
+func sliderValueAt(x int, lo, hi float64) float64 {
+	if x < 0 {
+		x = 0
+	}
+	if x > sliderWidth-1 {
+		x = sliderWidth - 1
+	}
+	frac := float64(x) / float64(sliderWidth-1)
+	return math.Exp(math.Log(lo) + frac*(math.Log(hi)-math.Log(lo)))
+}
+
 // viewNumberSlider renders the little modal shown below the size/zoom
 // control while typing: a min-to-max slider tracking the in-progress
 // value, on a log scale since both size and zoom are multiplicative
 // ranges (1..200, 25%..800%) where a linear slider would waste most of its
-// width on the low end.
+// width on the low end. The bar is zone-marked as a whole so clicking
+// anywhere along it — not just exactly on the dot — jumps the value there.
 func (m Model) viewNumberSlider() string {
-	var lo, hi float64
-	var label string
-	switch m.numEntryTarget {
-	case "size":
-		lo, hi, label = sizeMin, sizeMax, "size"
-	case "zoom":
-		lo, hi, label = zoomMin*100, zoomMax*100, "zoom"
-	default:
+	lo, hi, label, ok := m.numberEntryRange()
+	if !ok {
 		return ""
 	}
 
@@ -109,7 +179,7 @@ func (m Model) viewNumberSlider() string {
 	}
 	bar.WriteByte(']')
 
-	body := label + " " + bar.String() + "\n" +
-		dimStyle.Render("type digits, enter to confirm, esc to cancel")
+	body := label + " " + zone.Mark(zoneSlider, bar.String()) + "\n" +
+		dimStyle.Render("click or ←/→ to adjust, type digits, enter to confirm, esc to cancel")
 	return modalStyle.Render(body)
 }

@@ -135,9 +135,42 @@ func (m Model) toolButton(id string, t Tool, active bool) string {
 	return m.button(id, label, active)
 }
 
-func (m Model) toolbarLines() []string {
-	colorSwatch := lipgloss.NewStyle().Foreground(lipgloss.Color(m.color)).Render("●")
+// colorButton renders the color-picker toggle. The swatch dot needs its own
+// Foreground style; nesting that pre-rendered (already-ANSI-coded) string
+// inside another Style.Render call as if it were plain text corrupted the
+// output (raw escape codes showing up as literal text) whenever the outer
+// style also applied a background — so the swatch and the surrounding
+// button text are rendered as separate, sibling segments instead.
+func (m Model) colorButton() string {
+	active := m.mode == modeColorPicker
+	text := m.styleFor(zoneColorButton, active)
+	swatch := lipgloss.NewStyle().Foreground(lipgloss.Color(m.color))
+	if !active && m.hoverZone == zoneColorButton {
+		swatch = swatch.Background(lipgloss.Color("#444444"))
+	}
+	return zone.Mark(zoneColorButton, text.Render(" ")+swatch.Render("●")+text.Render(" Color "))
+}
+
+// compactToolbarLine renders the minimal toolbar: current tool, filled
+// status, size, and zoom, plus the toggle to get the full toolbar back.
+func (m Model) compactToolbarLine() []string {
+	toolLabel := strings.ToUpper(string(m.tool[:1])) + string(m.tool[1:])
 	buttons := []string{
+		m.button(zoneCompact, "☰", false),
+		inactiveStyle.Render(toolLabel),
+		m.button(zoneFilled, "Filled: "+onOff(m.filled), m.filled),
+		m.button(zoneSizeValue, "size "+m.numberEntryLabel("size", "", m.size), m.mode == modeNumberEntry && m.numEntryTarget == "size"),
+		m.button(zoneZoomValue, "zoom "+m.numberEntryLabel("zoom", "%", m.doc().Zoom*100), m.mode == modeNumberEntry && m.numEntryTarget == "zoom"),
+	}
+	return wrapButtons(buttons, m.width)
+}
+
+func (m Model) toolbarLines() []string {
+	if m.compact {
+		return m.compactToolbarLine()
+	}
+	buttons := []string{
+		m.button(zoneCompact, "☰", false),
 		m.button(zoneNew, "New", false),
 		m.button(zoneOpen, "Open", false),
 		m.button(zoneSave, "Save", false),
@@ -156,7 +189,7 @@ func (m Model) toolbarLines() []string {
 		m.toolButton(zoneToolFill, ToolFill, m.tool == ToolFill),
 		m.toolButton(zoneToolText, ToolText, m.tool == ToolText),
 		m.button(zoneFilled, "Filled: "+onOff(m.filled), m.filled),
-		m.button(zoneColorButton, colorSwatch+" Color", m.mode == modeColorPicker),
+		m.colorButton(),
 		m.button(zoneSizeDec, "-", false),
 		m.button(zoneSizeValue, "size "+m.numberEntryLabel("size", "", m.size), m.mode == modeNumberEntry && m.numEntryTarget == "size"),
 		m.button(zoneSizeInc, "+", false),
@@ -199,12 +232,12 @@ func (m Model) viewColorPicker() string {
 // change it (edits, pan, zoom, viewport size, active tab) has changed.
 func (m Model) canvasRaster(cols, rows int, d *Document, zoom float64) *Raster {
 	c := m.cache
-	if c.raster != nil && c.doc == d && c.docVer == d.Version &&
+	if c.raster != nil && c.doc == d && c.docVer == d.Version && c.highlightID == m.hoverEditID &&
 		c.cols == cols && c.rows == rows && c.offset == d.Offset && c.zoom == zoom {
 		return c.raster
 	}
-	r := RasterizeDocument(d.Edits, cols, rows, d.Offset.X, d.Offset.Y, zoom, selectColor)
-	*c = canvasCache{raster: r, cols: cols, rows: rows, offset: d.Offset, zoom: zoom, doc: d, docVer: d.Version}
+	r := RasterizeDocument(d.Edits, cols, rows, d.Offset.X, d.Offset.Y, zoom, selectColor, m.hoverEditID, hoverEditColor)
+	*c = canvasCache{raster: r, cols: cols, rows: rows, offset: d.Offset, zoom: zoom, doc: d, docVer: d.Version, highlightID: m.hoverEditID}
 	return r
 }
 

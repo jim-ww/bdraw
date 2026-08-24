@@ -28,7 +28,33 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m.handleWheel(wheel)
 	}
 
+	// An active pan-drag takes priority over zone hit-testing: once
+	// started, motion/release must keep driving it even if the drag path
+	// crosses a toolbar zone — otherwise a pan that passes near the top of
+	// the canvas silently stalls, and a release that lands on a zone would
+	// leave m.panning stuck true, breaking every mouse action after it.
+	if m.panning {
+		if col, row, ok := m.canvasCell(msg); ok {
+			return m.handlePan(msg, col, row)
+		}
+		if _, ok := msg.(tea.MouseReleaseMsg); ok {
+			m.panning = false
+		}
+		return m, nil
+	}
+
 	if id := m.zoneAt(msg); id != "" {
+		if id == zoneSlider && m.mode == modeNumberEntry {
+			switch msg.(type) {
+			case tea.MouseClickMsg:
+				return m.sliderSeek(msg)
+			case tea.MouseMotionMsg:
+				if msg.Mouse().Button == tea.MouseLeft {
+					return m.sliderSeek(msg)
+				}
+			}
+			return m, nil
+		}
 		if click, ok := msg.(tea.MouseClickMsg); ok && click.Mouse().Button == tea.MouseLeft {
 			return m.handleZoneClick(id)
 		}
@@ -40,8 +66,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	mouse := msg.Mouse()
-	if mouse.Button == tea.MouseMiddle || m.panning {
+	if msg.Mouse().Button == tea.MouseMiddle {
 		return m.handlePan(msg, col, row)
 	}
 
@@ -52,6 +77,18 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 
 	pt := m.cellToPoint(col, row)
+
+	m.hoverEditID = 0
+	if !m.dragging && (m.tool == ToolMove || m.tool == ToolEraser) {
+		tolerance := float64(selectTolerance)
+		if m.tool == ToolEraser {
+			tolerance = eraserRadius(m.size)
+		}
+		if e := m.nearestEdit(pt, tolerance); e != nil {
+			m.hoverEditID = e.ID
+		}
+	}
+
 	switch e := msg.(type) {
 	case tea.MouseClickMsg:
 		if e.Mouse().Button == tea.MouseLeft {
@@ -110,6 +147,26 @@ func (m *Model) handlePan(msg tea.MouseMsg, col, row int) (tea.Model, tea.Cmd) {
 	return *m, nil
 }
 
+// sliderSeek jumps the size/zoom slider to wherever the mouse landed on
+// its track, so — unlike a real GUI slider's grab handle — you can click
+// or drag anywhere along the bar, not just exactly on the dot.
+func (m *Model) sliderSeek(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	zi := zone.Get(zoneSlider)
+	if zi == nil {
+		return *m, nil
+	}
+	x, _ := zi.Pos(msg)
+	if x < 0 {
+		return *m, nil
+	}
+	lo, hi, _, ok := m.numberEntryRange()
+	if !ok {
+		return *m, nil
+	}
+	m.applyNumberEntryValue(sliderValueAt(x-1, lo, hi))
+	return *m, nil
+}
+
 // zoneAt returns the bubblezone ID under the mouse event, if any.
 func (m Model) zoneAt(msg tea.MouseMsg) string {
 	for _, id := range m.zoneIDs() {
@@ -160,11 +217,11 @@ func (m *Model) toolDown(pt Point) (tea.Model, tea.Cmd) {
 		if zoom == 0 {
 			zoom = 1
 		}
-		check := RasterizeDocument(d.Edits, cols, rows, d.Offset.X, d.Offset.Y, zoom, selectColor)
+		check := RasterizeDocument(d.Edits, cols, rows, d.Offset.X, d.Offset.Y, zoom, selectColor, 0, "")
 		col := int(((pt.X - d.Offset.X) * zoom) / SubpixW)
 		row := int(((pt.Y - d.Offset.Y) * zoom) / SubpixH)
 		if _, touchesEdge := check.floodRegion(col, row); touchesEdge {
-			m.status = "fill needs an enclosed area — background fill isn't supported"
+			m.status = "fill needs an enclosed area"
 			return *m, nil
 		}
 		d.BeginChange()
@@ -181,19 +238,30 @@ func (m *Model) toolDown(pt Point) (tea.Model, tea.Cmd) {
 	return *m, nil
 }
 
-// minDragPointDist is the minimum distance (world subpixels) between
+// minDragScreenDist is the minimum distance, in screen subpixels, between
 // consecutive brush points. Terminals can report mouse motion faster than
 // the cursor visibly moves; without decimation a fast, long drag piles up
-// far more points than the line needs, and since every point is
-// redrawn every frame (see BenchmarkRasterizeDocument), that cost compounds
-// into visible lag the longer and faster you draw.
-const minDragPointDist = 3
+// far more points than the line needs, and since every point is redrawn
+// every frame (see BenchmarkRasterizeDocument), that cost compounds into
+// visible lag the longer and faster you draw.
+//
+// This has to be a screen-space distance converted to world units per
+// current zoom, not a flat world-space one: mouse motion only ever arrives
+// in whole terminal cells, so at high zoom a single cell of movement is a
+// tiny world distance. A flat world threshold silently dropped nearly
+// every point at high zoom, making strokes advance in visible cell-sized
+// jumps instead of smoothly.
+const minDragScreenDist = 3
 
 func (m *Model) toolDrag(pt Point) (tea.Model, tea.Cmd) {
 	switch m.tool {
 	case ToolBrush:
+		zoom := m.doc().Zoom
+		if zoom == 0 {
+			zoom = 1
+		}
 		last := m.dragEdit.Points[len(m.dragEdit.Points)-1]
-		if distance(last, pt) >= minDragPointDist {
+		if distance(last, pt)*zoom >= minDragScreenDist {
 			m.dragEdit.Points = append(m.dragEdit.Points, pt)
 			m.doc().Touch()
 		}

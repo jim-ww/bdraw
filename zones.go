@@ -74,6 +74,9 @@ const (
 	zoneZoomOut     = "zoom-out"
 
 	zoneNewTab = "tab-new"
+	zoneSlider = "number-slider"
+
+	zoneCompact = "compact"
 )
 
 func zoneColor(i int) string    { return fmt.Sprintf("color-%d", i) }
@@ -88,15 +91,22 @@ func (m Model) zoneIDs() []string {
 		zoneToolBrush, zoneToolRect, zoneToolCircle, zoneToolLine,
 		zoneToolEraser, zoneToolSelect, zoneToolText, zoneToolMove, zoneToolFill,
 		zoneSizeInc, zoneSizeDec, zoneSizeValue, zoneColorButton, zoneZoomIn, zoneZoomOut, zoneZoomValue,
-		zoneGrid, zoneFilled, zoneNewTab,
+		zoneGrid, zoneFilled, zoneNewTab, zoneCompact,
 	}
 	if m.mode == modeColorPicker {
 		for i := range Palette {
 			ids = append(ids, zoneColor(i))
 		}
 	}
+	if m.mode == modeNumberEntry {
+		ids = append(ids, zoneSlider)
+	}
 	for i := range m.tabs {
-		ids = append(ids, zoneTab(i), zoneTabClose(i))
+		// The close 'x' zone is nested inside the tab's own zone, so it
+		// must be checked first — zoneAt returns the first match, and the
+		// tab zone's bounding box also covers the 'x', so checking it
+		// first would swallow every click meant for close.
+		ids = append(ids, zoneTabClose(i), zoneTab(i))
 	}
 	return ids
 }
@@ -172,6 +182,8 @@ func (m Model) handleZoneClick(id string) (tea.Model, tea.Cmd) {
 		m.showGrid = !m.showGrid
 	case zoneFilled:
 		m.filled = !m.filled
+	case zoneCompact:
+		m.compact = !m.compact
 	case zoneNewTab:
 		m.doNewTab()
 

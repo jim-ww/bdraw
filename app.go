@@ -35,6 +35,7 @@ var toolCursor = map[Tool]rune{
 }
 
 const cursorColor = "#00ffaa"
+const hoverEditColor = "#00ffaa"
 
 // Palette is the fixed set of quick-pick colors offered in the color-picker
 // modal.
@@ -114,8 +115,14 @@ type Model struct {
 	// button, tab, swatch), so buttons can highlight on hover.
 	hoverZone string
 
+	// hoverEditID is the edit currently under the cursor for the move and
+	// eraser tools (0 = none), highlighted so it's clear what a click
+	// would act on.
+	hoverEditID int
+
 	showGrid bool
 	filled   bool
+	compact  bool
 
 	// numberEntry is the shared click-to-type-a-number state, used by both
 	// the size and zoom controls (see numberentry.go).
@@ -139,13 +146,14 @@ type Model struct {
 // like an old CRT" lag. Reusing the last frame whenever the document
 // hasn't actually changed fixes that.
 type canvasCache struct {
-	raster *Raster
-	cols   int
-	rows   int
-	offset Point
-	zoom   float64
-	doc    *Document
-	docVer int
+	raster      *Raster
+	cols        int
+	rows        int
+	offset      Point
+	zoom        float64
+	doc         *Document
+	docVer      int
+	highlightID int
 }
 
 func NewModel() Model {

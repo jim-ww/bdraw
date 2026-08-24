@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"path/filepath"
 	"strings"
 )
@@ -33,7 +34,9 @@ func (m *Model) setSize(s float64) {
 	if s > sizeMax {
 		s = sizeMax
 	}
-	m.size = s
+	// Round to 1 decimal: repeated multiplicative steps (sizeInc/sizeDec)
+	// otherwise drift into float noise like 2.3424343243243.
+	m.size = math.Round(s*10) / 10
 }
 
 func (m *Model) openColorPicker() {
@@ -67,6 +70,9 @@ func (m *Model) zoomAt(factor float64, col, row int) {
 	if newZoom > zoomMax {
 		newZoom = zoomMax
 	}
+	// Round the same way setSize does: repeated multiplicative steps
+	// otherwise drift into float noise in the displayed percentage.
+	newZoom = math.Round(newZoom*1000) / 1000
 	d.Zoom = newZoom
 
 	sx := float64(col)*SubpixW + SubpixW/2

@@ -57,6 +57,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showGrid = !m.showGrid
 	case key.Matches(msg, m.km.ToggleFill):
 		m.filled = !m.filled
+	case key.Matches(msg, m.km.ToggleCompact):
+		m.compact = !m.compact
 
 	case key.Matches(msg, m.km.NewTab):
 		m.doNewTab()

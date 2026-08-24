@@ -63,29 +63,35 @@ func (r *Raster) Background(col, row int) string {
 // world coordinate at the viewport's top-left and zoom is world-to-screen
 // scale (subpixels of screen per subpixel of world).
 //
+// highlightID, if nonzero, recolors that one edit with highlightColor —
+// used for the move/eraser tools' hover highlight — the same way a
+// Selected edit is recolored with selectColor.
+//
 // Fill edits are applied in a second pass, after every other edit, since a
 // flood fill needs the full set of ink boundaries already in place to know
 // where to stop.
-func RasterizeDocument(edits []*Edit, cols, rows int, ox, oy, zoom float64, selectColor string) *Raster {
+func RasterizeDocument(edits []*Edit, cols, rows int, ox, oy, zoom float64, selectColor string, highlightID int, highlightColor string) *Raster {
 	r := &Raster{Cols: cols, Rows: rows, cells: make([]cell, cols*rows)}
+	pick := func(e *Edit) string {
+		switch {
+		case highlightID != 0 && e.ID == highlightID:
+			return highlightColor
+		case e.Selected:
+			return selectColor
+		default:
+			return e.Color
+		}
+	}
 	var fills []*Edit
 	for _, e := range edits {
 		if e.Kind == KindFill {
 			fills = append(fills, e)
 			continue
 		}
-		color := e.Color
-		if e.Selected {
-			color = selectColor
-		}
-		r.drawEdit(e, ox, oy, zoom, color)
+		r.drawEdit(e, ox, oy, zoom, pick(e))
 	}
 	for _, e := range fills {
-		color := e.Color
-		if e.Selected {
-			color = selectColor
-		}
-		r.floodFill(e, ox, oy, zoom, color)
+		r.floodFill(e, ox, oy, zoom, pick(e))
 	}
 	return r
 }
@@ -175,13 +181,15 @@ func (r *Raster) drawEdit(e *Edit, ox, oy, zoom float64, color string) {
 	case KindRect:
 		if e.Filled {
 			r.fillRect(pts, color)
+		} else {
+			r.drawRect(pts, size, color)
 		}
-		r.drawRect(pts, size, color)
 	case KindCircle:
 		if e.Filled {
 			r.fillEllipse(pts, color)
+		} else {
+			r.drawEllipse(pts, size, color)
 		}
-		r.drawEllipse(pts, size, color)
 	case KindText:
 		r.drawText(pts, e.Text, color)
 	}
