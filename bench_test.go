@@ -5,7 +5,7 @@ import (
 	"math/rand"
 	"testing"
 
-	zone "github.com/lrstanley/bubblezone"
+	zone "github.com/lrstanley/bubblezone/v2"
 )
 
 func TestMain(m *testing.M) {

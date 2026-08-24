@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"os"
 
-	tea "github.com/charmbracelet/bubbletea"
-	zone "github.com/lrstanley/bubblezone"
+	tea "charm.land/bubbletea/v2"
+	zone "github.com/lrstanley/bubblezone/v2"
 )
 
 func main() {
 	zone.NewGlobal()
 
-	p := tea.NewProgram(NewModel(), tea.WithAltScreen(), tea.WithMouseAllMotion())
+	p := tea.NewProgram(NewModel())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "bdraw:", err)
 		os.Exit(1)

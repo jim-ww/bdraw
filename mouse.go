@@ -1,8 +1,8 @@
 package main
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
-	zone "github.com/lrstanley/bubblezone"
+	tea "charm.land/bubbletea/v2"
+	zone "github.com/lrstanley/bubblezone/v2"
 )
 
 // eraserRadius returns how close (in world subpixels) the eraser must pass
@@ -20,16 +20,16 @@ func eraserRadius(size float64) float64 {
 const selectTolerance = 6
 
 func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	if msg.Action == tea.MouseActionMotion {
+	if _, ok := msg.(tea.MouseMotionMsg); ok {
 		m.hoverZone = m.zoneAt(msg)
 	}
 
-	if msg.Button == tea.MouseButtonWheelUp || msg.Button == tea.MouseButtonWheelDown {
-		return m.handleWheel(msg)
+	if wheel, ok := msg.(tea.MouseWheelMsg); ok {
+		return m.handleWheel(wheel)
 	}
 
 	if id := m.zoneAt(msg); id != "" {
-		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
+		if click, ok := msg.(tea.MouseClickMsg); ok && click.Mouse().Button == tea.MouseLeft {
 			return m.handleZoneClick(id)
 		}
 		return m, nil
@@ -40,7 +40,8 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if msg.Button == tea.MouseButtonMiddle || m.panning {
+	mouse := msg.Mouse()
+	if mouse.Button == tea.MouseMiddle || m.panning {
 		return m.handlePan(msg, col, row)
 	}
 
@@ -51,16 +52,16 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 
 	pt := m.cellToPoint(col, row)
-	switch msg.Action {
-	case tea.MouseActionPress:
-		if msg.Button == tea.MouseButtonLeft {
+	switch e := msg.(type) {
+	case tea.MouseClickMsg:
+		if e.Mouse().Button == tea.MouseLeft {
 			return m.toolDown(pt)
 		}
-	case tea.MouseActionMotion:
+	case tea.MouseMotionMsg:
 		if m.dragging {
 			return m.toolDrag(pt)
 		}
-	case tea.MouseActionRelease:
+	case tea.MouseReleaseMsg:
 		if m.dragging {
 			return m.toolUp(pt)
 		}
@@ -71,9 +72,9 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 // handleWheel zooms in/out centered on the cursor's world position (if the
 // wheel event landed on the canvas) so the point under the mouse stays put
 // instead of the view re-centering somewhere else.
-func (m *Model) handleWheel(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 	factor := zoomStep
-	if msg.Button == tea.MouseButtonWheelDown {
+	if msg.Mouse().Button == tea.MouseWheelDown {
 		factor = 1 / zoomStep
 	}
 	if col, row, ok := m.canvasCell(msg); ok {
@@ -87,11 +88,11 @@ func (m *Model) handleWheel(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 // handlePan drives middle-mouse-button drag panning: press starts it,
 // motion translates the view by the screen-cell delta, release ends it.
 func (m *Model) handlePan(msg tea.MouseMsg, col, row int) (tea.Model, tea.Cmd) {
-	switch msg.Action {
-	case tea.MouseActionPress:
+	switch msg.(type) {
+	case tea.MouseClickMsg:
 		m.panning = true
 		m.panLastCol, m.panLastRow = col, row
-	case tea.MouseActionMotion:
+	case tea.MouseMotionMsg:
 		if m.panning {
 			d := m.doc()
 			zoom := d.Zoom
@@ -103,7 +104,7 @@ func (m *Model) handlePan(msg tea.MouseMsg, col, row int) (tea.Model, tea.Cmd) {
 			d.Offset.Y -= float64(dRow) * SubpixH / zoom
 			m.panLastCol, m.panLastRow = col, row
 		}
-	case tea.MouseActionRelease:
+	case tea.MouseReleaseMsg:
 		m.panning = false
 	}
 	return *m, nil

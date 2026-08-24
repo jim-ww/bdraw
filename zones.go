@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // FooterRows is the fixed-height status row at the bottom. The header
@@ -17,12 +17,13 @@ func (m Model) canvasSize() (cols, rows int) {
 }
 
 func (m Model) canvasCell(msg tea.MouseMsg) (col, row int, ok bool) {
+	mouse := msg.Mouse()
 	top := m.headerHeight()
 	bottom := m.height - FooterRows
-	if msg.Y < top || msg.Y >= bottom || msg.X < 0 || msg.X >= m.width {
+	if mouse.Y < top || mouse.Y >= bottom || mouse.X < 0 || mouse.X >= m.width {
 		return 0, 0, false
 	}
-	return msg.X, msg.Y - top, true
+	return mouse.X, mouse.Y - top, true
 }
 
 // cellToPoint converts a screen cell in the canvas viewport to a world

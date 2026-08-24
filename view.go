@@ -4,8 +4,9 @@ import (
 	"math"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
-	zone "github.com/lrstanley/bubblezone"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	zone "github.com/lrstanley/bubblezone/v2"
 )
 
 const selectColor = "#ffaa00"
@@ -22,9 +23,9 @@ var (
 // barely noticeable, there purely to help line things up.
 const gridDotColor = "#3a3a3a"
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
 	if m.width == 0 {
-		return ""
+		return tea.NewView("")
 	}
 	var b strings.Builder
 	for _, line := range m.tabLines() {
@@ -46,7 +47,11 @@ func (m Model) View() string {
 	b.WriteString(m.viewCanvas())
 	b.WriteString("\n")
 	b.WriteString(m.viewStatus())
-	return zone.Scan(b.String())
+
+	v := tea.NewView(zone.Scan(b.String()))
+	v.AltScreen = true
+	v.MouseMode = tea.MouseModeAllMotion
+	return v
 }
 
 // headerHeight is how many rows the tabs + toolbar (+ color picker modal,

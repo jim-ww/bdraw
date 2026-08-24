@@ -1,6 +1,6 @@
 package main
 
-import "github.com/charmbracelet/bubbles/key"
+import "charm.land/bubbles/v2/key"
 
 // bindingTooltips maps a zone ID to the KeyMap binding that does the same
 // thing, so hovering a button can show its keyboard shortcut.
