@@ -190,8 +190,7 @@ func (m Model) marqueeBounds(offset Point, zoom float64) (x0, y0, x1, y1 int, ok
 }
 
 func (m Model) viewCanvas() string {
-	cols := m.width
-	rows := m.height - m.headerHeight() - FooterRows
+	cols, rows := m.canvasSize()
 	if cols <= 0 || rows <= 0 {
 		return ""
 	}

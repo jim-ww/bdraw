@@ -143,6 +143,18 @@ func (m *Model) toolDown(pt Point) (tea.Model, tea.Cmd) {
 		}
 
 	case ToolFill:
+		cols, rows := m.canvasSize()
+		zoom := d.Zoom
+		if zoom == 0 {
+			zoom = 1
+		}
+		check := RasterizeDocument(d.Edits, cols, rows, d.Offset.X, d.Offset.Y, zoom, selectColor)
+		col := int(((pt.X - d.Offset.X) * zoom) / SubpixW)
+		row := int(((pt.Y - d.Offset.Y) * zoom) / SubpixH)
+		if _, touchesEdge := check.floodRegion(col, row); touchesEdge {
+			m.status = "fill needs an enclosed area — background fill isn't supported"
+			return *m, nil
+		}
 		d.BeginChange()
 		e := &Edit{ID: d.NextID(), Kind: KindFill, Points: []Point{pt}, Color: m.color}
 		d.Edits = append(d.Edits, e)

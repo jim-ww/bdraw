@@ -11,6 +11,11 @@ import (
 // to fit m.width, computed by headerHeight.
 const FooterRows = 1
 
+// canvasSize is the canvas viewport's size in cells.
+func (m Model) canvasSize() (cols, rows int) {
+	return m.width, m.height - m.headerHeight() - FooterRows
+}
+
 func (m Model) canvasCell(msg tea.MouseMsg) (col, row int, ok bool) {
 	top := m.headerHeight()
 	bottom := m.height - FooterRows

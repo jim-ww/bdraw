@@ -90,35 +90,37 @@ func RasterizeDocument(edits []*Edit, cols, rows int, ox, oy, zoom float64, sele
 	return r
 }
 
-// floodFill paints the background of every empty cell reachable from e's
-// seed point without crossing ink, so a fill click covers exactly the
-// enclosed (or open, up to the viewport edge) region it lands in.
-func (r *Raster) floodFill(e *Edit, ox, oy, zoom float64, color string) {
-	if len(e.Points) == 0 {
-		return
-	}
-	p := e.Points[0]
-	col := int(((p.X - ox) * zoom) / SubpixW)
-	row := int(((p.Y - oy) * zoom) / SubpixH)
+type gridCoord struct{ col, row int }
+
+// floodRegion walks every empty cell reachable from (col, row) without
+// crossing ink, 4-directionally. touchesEdge reports whether the region
+// reached the viewport boundary rather than being fully enclosed by ink —
+// i.e. whether this is (as far as the current viewport can tell) open
+// background rather than a closed shape.
+func (r *Raster) floodRegion(col, row int) (cells []gridCoord, touchesEdge bool) {
 	if col < 0 || col >= r.Cols || row < 0 || row >= r.Rows {
-		return
+		return nil, true
 	}
-	start := r.at(col, row)
-	if !start.empty() {
-		return
+	if !r.at(col, row).empty() {
+		return nil, false
 	}
 
-	type coord struct{ col, row int }
-	queue := []coord{{col, row}}
-	visited := make(map[coord]bool, 64)
-	visited[coord{col, row}] = true
+	queue := []gridCoord{{col, row}}
+	visited := map[gridCoord]bool{{col, row}: true}
 	for len(queue) > 0 {
 		c := queue[0]
 		queue = queue[1:]
-		r.at(c.col, c.row).bg = color
-		for _, d := range [4]coord{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
-			n := coord{c.col + d.col, c.row + d.row}
-			if n.col < 0 || n.col >= r.Cols || n.row < 0 || n.row >= r.Rows || visited[n] {
+		if c.col == 0 || c.col == r.Cols-1 || c.row == 0 || c.row == r.Rows-1 {
+			touchesEdge = true
+		}
+		cells = append(cells, c)
+		for _, d := range [4]gridCoord{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
+			n := gridCoord{c.col + d.col, c.row + d.row}
+			if n.col < 0 || n.col >= r.Cols || n.row < 0 || n.row >= r.Rows {
+				touchesEdge = true
+				continue
+			}
+			if visited[n] {
 				continue
 			}
 			visited[n] = true
@@ -126,6 +128,28 @@ func (r *Raster) floodFill(e *Edit, ox, oy, zoom float64, color string) {
 				queue = append(queue, n)
 			}
 		}
+	}
+	return cells, touchesEdge
+}
+
+// floodFill paints the background of every empty cell reachable from e's
+// seed point without crossing ink. It silently no-ops on an open region —
+// callers should reject that at fill-creation time (see mouse.go) so the
+// edit never gets added in the first place; this is just a safety net if
+// the viewport boundaries have shifted since.
+func (r *Raster) floodFill(e *Edit, ox, oy, zoom float64, color string) {
+	if len(e.Points) == 0 {
+		return
+	}
+	p := e.Points[0]
+	col := int(((p.X - ox) * zoom) / SubpixW)
+	row := int(((p.Y - oy) * zoom) / SubpixH)
+	cells, touchesEdge := r.floodRegion(col, row)
+	if touchesEdge {
+		return
+	}
+	for _, c := range cells {
+		r.at(c.col, c.row).bg = color
 	}
 }
 
