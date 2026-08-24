@@ -7,11 +7,18 @@ import (
 	"strings"
 )
 
+// CurrentFileVersion is written into every saved .bdraw.json file. Bump it
+// whenever the file format changes in a way that needs migration logic.
+const CurrentFileVersion = 1
+
 type fileFormat struct {
-	Edits []*Edit `json:"edits"`
+	Version int     `json:"version"`
+	Edits   []*Edit `json:"edits"`
 }
 
-// LoadDocument reads a document from a .bdraw.json file at path.
+// LoadDocument reads a document from a .bdraw.json file at path. Files
+// saved before versioning existed simply have no "version" field, which
+// unmarshals as 0 — that's fine, there's nothing to migrate yet.
 func LoadDocument(path string) (*Document, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -20,6 +27,9 @@ func LoadDocument(path string) (*Document, error) {
 	var f fileFormat
 	if err := json.Unmarshal(data, &f); err != nil {
 		return nil, fmt.Errorf("parse %s: %w", path, err)
+	}
+	if f.Version > CurrentFileVersion {
+		return nil, fmt.Errorf("%s was saved by a newer version of bdraw (file version %d, this build supports up to %d)", path, f.Version, CurrentFileVersion)
 	}
 	d := NewDocument()
 	d.Path = path
@@ -34,7 +44,7 @@ func LoadDocument(path string) (*Document, error) {
 
 // Save writes the document as JSON to path.
 func (d *Document) Save(path string) error {
-	data, err := json.MarshalIndent(fileFormat{Edits: d.Edits}, "", "  ")
+	data, err := json.MarshalIndent(fileFormat{Version: CurrentFileVersion, Edits: d.Edits}, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal document: %w", err)
 	}
@@ -50,4 +60,9 @@ func (d *Document) Save(path string) error {
 // JSON document.
 func IsPNGPath(path string) bool {
 	return strings.HasSuffix(strings.ToLower(path), ".png")
+}
+
+// IsSVGPath reports whether path names an SVG export target.
+func IsSVGPath(path string) bool {
+	return strings.HasSuffix(strings.ToLower(path), ".svg")
 }

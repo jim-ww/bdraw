@@ -219,17 +219,32 @@ func (m *Model) clearSelection() {
 
 func (m *Model) saveTo(path string) {
 	d := m.doc()
-	var err error
-	if IsPNGPath(path) {
-		err = ExportPNG(d, path)
-	} else {
-		err = d.Save(path)
+	switch {
+	case IsPNGPath(path):
+		if err := ExportPNG(d, path); err != nil {
+			m.status = fmt.Sprintf("save failed: %v", err)
+			return
+		}
+		m.status = "saved " + path
+
+	case IsSVGPath(path):
+		skipped, err := ExportSVG(d, path)
+		if err != nil {
+			m.status = fmt.Sprintf("save failed: %v", err)
+			return
+		}
+		m.status = "saved " + path
+		if skipped > 0 {
+			m.status += fmt.Sprintf(" (%d fill(s) skipped — not representable in SVG)", skipped)
+		}
+
+	default:
+		if err := d.Save(path); err != nil {
+			m.status = fmt.Sprintf("save failed: %v", err)
+			return
+		}
+		m.status = "saved " + path
 	}
-	if err != nil {
-		m.status = fmt.Sprintf("save failed: %v", err)
-		return
-	}
-	m.status = "saved " + path
 }
 
 func (m *Model) openFrom(path string) {
