@@ -134,7 +134,16 @@ func (r *Raster) drawEdit(e *Edit, ox, oy, zoom float64, color string) {
 	for i, p := range e.Points {
 		pts[i] = Point{X: (p.X - ox) * zoom, Y: (p.Y - oy) * zoom}
 	}
+	// Clamp screen-space thickness: past a certain point a fatter brush is
+	// visually just a solid blob, but plotThick's cost is quadratic in
+	// radius, so an unclamped size*zoom (e.g. a fat brush at 800% zoom)
+	// makes every point of every stroke drawn this frame far more
+	// expensive than the extra thickness is worth.
+	const maxScreenSize = 64
 	size := e.Size * zoom
+	if size > maxScreenSize {
+		size = maxScreenSize
+	}
 
 	switch e.Kind {
 	case KindStroke, KindLine:

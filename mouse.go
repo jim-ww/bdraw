@@ -131,9 +131,8 @@ func (m *Model) toolDown(pt Point) (tea.Model, tea.Cmd) {
 		m.eraseAt(pt)
 
 	case ToolSelect:
-		if e := m.nearestEdit(pt, selectTolerance); e != nil {
-			e.Selected = !e.Selected
-		}
+		m.selectStart, m.selectLast = pt, pt
+		m.dragging = true
 
 	case ToolMove:
 		m.moveTargets = m.selectedOrNearest(pt)
@@ -172,9 +171,11 @@ func (m *Model) toolDrag(pt Point) (tea.Model, tea.Cmd) {
 		last := m.dragEdit.Points[len(m.dragEdit.Points)-1]
 		if distance(last, pt) >= minDragPointDist {
 			m.dragEdit.Points = append(m.dragEdit.Points, pt)
+			m.doc().Touch()
 		}
 	case ToolLine, ToolRect, ToolCircle:
 		m.dragEdit.Points[1] = pt
+		m.doc().Touch()
 	case ToolEraser:
 		m.eraseAt(pt)
 	case ToolMove:
@@ -186,22 +187,71 @@ func (m *Model) toolDrag(pt Point) (tea.Model, tea.Cmd) {
 			}
 		}
 		m.moveLast = pt
+		m.doc().Touch()
+	case ToolSelect:
+		m.selectLast = pt
 	}
 	return *m, nil
 }
+
+// selectDragThreshold is how far the mouse has to move between press and
+// release, in world subpixels, before a select-tool drag is treated as a
+// marquee rectangle rather than a click.
+const selectDragThreshold = 10
 
 func (m *Model) toolUp(pt Point) (tea.Model, tea.Cmd) {
 	switch m.tool {
 	case ToolLine, ToolRect, ToolCircle:
 		m.dragEdit.Points[1] = pt
+		m.doc().Touch()
 	case ToolEraser:
 		m.eraseAt(pt)
+	case ToolSelect:
+		m.selectLast = pt
+		if distance(m.selectStart, m.selectLast) < selectDragThreshold {
+			if e := m.nearestEdit(pt, selectTolerance); e != nil {
+				e.Selected = !e.Selected
+			}
+		} else {
+			m.selectRect(m.selectStart, m.selectLast)
+		}
+		m.doc().Touch()
 	}
 	m.dragging = false
 	m.dragEdit = nil
 	m.erasedIDs = nil
 	m.moveTargets = nil
 	return *m, nil
+}
+
+// selectRect replaces the current selection with every edit that has at
+// least one point inside the rectangle spanned by a and b.
+func (m *Model) selectRect(a, b Point) {
+	x0, x1 := minF(a.X, b.X), maxF(a.X, b.X)
+	y0, y1 := minF(a.Y, b.Y), maxF(a.Y, b.Y)
+	for _, e := range m.doc().Edits {
+		e.Selected = false
+		for _, p := range e.Points {
+			if p.X >= x0 && p.X <= x1 && p.Y >= y0 && p.Y <= y1 {
+				e.Selected = true
+				break
+			}
+		}
+	}
+}
+
+func minF(a, b float64) float64 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func maxF(a, b float64) float64 {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 // eraseAt removes every edit (not already removed this drag) whose
@@ -219,6 +269,7 @@ func (m *Model) eraseAt(pt Point) {
 		kept = append(kept, e)
 	}
 	d.Edits = kept
+	d.Touch()
 }
 
 // nearestEdit returns the closest edit to pt within tolerance, or nil.

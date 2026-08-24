@@ -180,9 +180,11 @@ func (m *Model) clearCanvas() {
 
 // clearSelection deselects every edit (esc, select tool).
 func (m *Model) clearSelection() {
-	for _, e := range m.doc().Edits {
+	d := m.doc()
+	for _, e := range d.Edits {
 		e.Selected = false
 	}
+	d.Touch()
 }
 
 func (m *Model) saveTo(path string) {

@@ -156,6 +156,39 @@ func (m Model) viewColorPicker() string {
 	return modalStyle.Render(body)
 }
 
+// canvasRaster returns the rasterized canvas for the current document/view
+// state, reusing the previous frame's raster whenever nothing that would
+// change it (edits, pan, zoom, viewport size, active tab) has changed.
+func (m Model) canvasRaster(cols, rows int, d *Document, zoom float64) *Raster {
+	c := m.cache
+	if c.raster != nil && c.doc == d && c.docVer == d.Version &&
+		c.cols == cols && c.rows == rows && c.offset == d.Offset && c.zoom == zoom {
+		return c.raster
+	}
+	r := RasterizeDocument(d.Edits, cols, rows, d.Offset.X, d.Offset.Y, zoom, selectColor)
+	*c = canvasCache{raster: r, cols: cols, rows: rows, offset: d.Offset, zoom: zoom, doc: d, docVer: d.Version}
+	return r
+}
+
+// marqueeBounds returns the select-tool drag rectangle in screen cells,
+// while it's being dragged.
+func (m Model) marqueeBounds(offset Point, zoom float64) (x0, y0, x1, y1 int, ok bool) {
+	if !(m.dragging && m.tool == ToolSelect) {
+		return 0, 0, 0, 0, false
+	}
+	c0 := int(((m.selectStart.X - offset.X) * zoom) / SubpixW)
+	r0 := int(((m.selectStart.Y - offset.Y) * zoom) / SubpixH)
+	c1 := int(((m.selectLast.X - offset.X) * zoom) / SubpixW)
+	r1 := int(((m.selectLast.Y - offset.Y) * zoom) / SubpixH)
+	if c0 > c1 {
+		c0, c1 = c1, c0
+	}
+	if r0 > r1 {
+		r0, r1 = r1, r0
+	}
+	return c0, r0, c1, r1, true
+}
+
 func (m Model) viewCanvas() string {
 	cols := m.width
 	rows := m.height - m.headerHeight() - FooterRows
@@ -167,14 +200,8 @@ func (m Model) viewCanvas() string {
 	if zoom == 0 {
 		zoom = 1
 	}
-	r := RasterizeDocument(d.Edits, cols, rows, d.Offset.X, d.Offset.Y, zoom, selectColor)
-
-	if m.cursorVisible && m.mode == modeNormal &&
-		m.cursorCol >= 0 && m.cursorCol < cols && m.cursorRow >= 0 && m.cursorRow < rows {
-		c := r.at(m.cursorCol, m.cursorRow)
-		c.glyph = toolCursor[m.tool]
-		c.color = cursorColor
-	}
+	r := m.canvasRaster(cols, rows, d, zoom)
+	mx0, my0, mx1, my1, marquee := m.marqueeBounds(d.Offset, zoom)
 
 	type styleKey struct{ fg, bg string }
 	styles := map[styleKey]lipgloss.Style{}
@@ -213,7 +240,20 @@ func (m Model) viewCanvas() string {
 
 		for col := 0; col < cols; col++ {
 			ru, color := r.Rune(col, row)
-			key := styleKey{fg: color, bg: r.Background(col, row)}
+			bg := r.Background(col, row)
+
+			switch {
+			case m.cursorVisible && m.mode == modeNormal && col == m.cursorCol && row == m.cursorRow:
+				ru, color = toolCursor[m.tool], cursorColor
+			case marquee && (col == mx0 || col == mx1) && row >= my0 && row <= my1,
+				marquee && (row == my0 || row == my1) && col >= mx0 && col <= mx1:
+				if ru == ' ' {
+					ru = '·'
+				}
+				color = selectColor
+			}
+
+			key := styleKey{fg: color, bg: bg}
 			if key != runKey {
 				flush()
 			}

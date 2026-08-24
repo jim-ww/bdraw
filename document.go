@@ -11,6 +11,13 @@ type Document struct {
 	Zoom    float64
 	nextID  int
 	History History
+
+	// Version increments on every content change (a new/removed edit, a
+	// point moved, a color or selection flipped — anything that could
+	// change what gets rendered). The canvas render cache in Model keys
+	// off it to know when a full re-rasterize is actually necessary,
+	// versus when only the mouse cursor moved.
+	Version int
 }
 
 // NewDocument returns an empty, untitled document.
@@ -37,6 +44,12 @@ func (d *Document) NextID() int {
 	return d.nextID
 }
 
+// Touch marks the document as changed for this frame's render cache. Call
+// it after any mutation to Edits or to an edit's fields.
+func (d *Document) Touch() {
+	d.Version++
+}
+
 // snapshot deep-copies the current edit list, for pushing onto history.
 func (d *Document) snapshot() []*Edit {
 	s := make([]*Edit, len(d.Edits))
@@ -52,6 +65,7 @@ func (d *Document) snapshot() []*Edit {
 func (d *Document) BeginChange() {
 	d.History.Push(d.snapshot())
 	d.Dirty = true
+	d.Touch()
 }
 
 // Undo reverts to the previous committed state, if any.
@@ -59,6 +73,7 @@ func (d *Document) Undo() {
 	if prev, ok := d.History.Undo(d.snapshot()); ok {
 		d.Edits = prev
 		d.Dirty = true
+		d.Touch()
 	}
 }
 
@@ -67,5 +82,6 @@ func (d *Document) Redo() {
 	if next, ok := d.History.Redo(d.snapshot()); ok {
 		d.Edits = next
 		d.Dirty = true
+		d.Touch()
 	}
 }

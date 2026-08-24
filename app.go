@@ -97,6 +97,8 @@ type Model struct {
 	textPos     Point
 	moveTargets []*Edit
 	moveLast    Point
+	selectStart Point
+	selectLast  Point
 
 	// middle-mouse-button pan drag
 	panning    bool
@@ -108,6 +110,29 @@ type Model struct {
 	cursorVisible        bool
 
 	status string
+
+	// cache is a pointer so it survives across the value-receiver
+	// Update/View calls bubbletea makes on Model: the pointer itself gets
+	// copied along with everything else, but it keeps pointing at the same
+	// canvasCache, so writes through it persist. See viewCanvas.
+	cache *canvasCache
+}
+
+// canvasCache holds the last rasterized canvas frame plus the exact view
+// state it was built for. Rasterizing every edit is the most expensive
+// thing this program does every frame (see BenchmarkRasterizeDocument); at
+// high zoom a full re-rasterize on every single mouse-motion event — even
+// pure cursor movement with nothing being drawn — was the "cursor drags
+// like an old CRT" lag. Reusing the last frame whenever the document
+// hasn't actually changed fixes that.
+type canvasCache struct {
+	raster *Raster
+	cols   int
+	rows   int
+	offset Point
+	zoom   float64
+	doc    *Document
+	docVer int
 }
 
 func NewModel() Model {
@@ -122,6 +147,7 @@ func NewModel() Model {
 		color:  Palette[0],
 		size:   1,
 		input:  ti,
+		cache:  &canvasCache{},
 		status: "mouse to draw · b/r/c/l/e/s/t/m tools · scroll/ctrl+=/- zoom · arrows/middle-drag pan · ctrl+q quit",
 	}
 }

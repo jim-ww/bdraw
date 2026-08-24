@@ -118,3 +118,41 @@ func BenchmarkDrawSegment(b *testing.B) {
 		r.drawSegment(0, 0, 300, 150, 1, "#ffffff")
 	}
 }
+
+// TestCanvasRasterCacheHit verifies pure cursor movement (no edits/pan/zoom
+// change) reuses the same Raster instead of re-rasterizing, which is the
+// actual fix for the high-zoom cursor lag.
+func TestCanvasRasterCacheHit(t *testing.T) {
+	m := NewModel()
+	m.width, m.height = 160, 48
+	m.doc().Edits = makeStrokes(200, 40)
+
+	r1 := m.canvasRaster(160, 40, m.doc(), 1)
+	m.cursorCol, m.cursorRow = 10, 10
+	r2 := m.canvasRaster(160, 40, m.doc(), 1)
+	if r1 != r2 {
+		t.Fatal("expected cached raster to be reused when only the cursor moved")
+	}
+
+	m.doc().Edits[0].Points[0].X += 1
+	m.doc().Touch()
+	r3 := m.canvasRaster(160, 40, m.doc(), 1)
+	if r3 == r1 {
+		t.Fatal("expected a rebuilt raster after a real edit change")
+	}
+}
+
+// BenchmarkCanvasRasterCached measures the cache-hit path cost (cursor
+// motion only), which should be tiny regardless of edit count or zoom,
+// unlike a full RasterizeDocument call.
+func BenchmarkCanvasRasterCached(b *testing.B) {
+	m := NewModel()
+	m.width, m.height = 160, 48
+	m.doc().Edits = makeStrokes(1000, 40)
+	m.doc().Zoom = 8
+	m.canvasRaster(160, 40, m.doc(), 8)
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		m.canvasRaster(160, 40, m.doc(), 8)
+	}
+}
