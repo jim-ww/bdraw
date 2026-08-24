@@ -9,14 +9,14 @@ import (
 // Config holds general (non-keybind) user preferences, loaded from
 // ~/.config/bdraw/config.json.
 type Config struct {
-	// UseIcons shows tool buttons as icons instead of names. Defaults to
-	// true; set "icons": false in the config file to switch to text
-	// labels.
+	// UseIcons shows tool buttons as icon glyphs instead of names. Off by
+	// default — the glyphs are compact but not self-explanatory; set
+	// "icons": true in the config file to enable them.
 	UseIcons bool `json:"icons"`
 }
 
 func DefaultConfig() Config {
-	return Config{UseIcons: true}
+	return Config{UseIcons: false}
 }
 
 // LoadConfig starts from DefaultConfig and applies overrides from

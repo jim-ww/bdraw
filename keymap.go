@@ -30,6 +30,12 @@ type KeyMap struct {
 	Open   key.Binding
 	Save   key.Binding
 	SaveAs key.Binding
+	Export key.Binding
+	Clear  key.Binding
+
+	ColorPicker key.Binding
+	ToggleGrid  key.Binding
+	ToggleFill  key.Binding
 
 	NextTab  key.Binding
 	PrevTab  key.Binding
@@ -75,6 +81,12 @@ func DefaultKeyMap() KeyMap {
 		Open:   bind([]string{"ctrl+o"}, "open"),
 		Save:   bind([]string{"ctrl+s"}, "save"),
 		SaveAs: bind([]string{"ctrl+shift+s"}, "save as"),
+		Export: bind([]string{"ctrl+e"}, "export"),
+		Clear:  bind([]string{"ctrl+x"}, "clear canvas"),
+
+		ColorPicker: bind([]string{"p"}, "color picker"),
+		ToggleGrid:  bind([]string{"g"}, "toggle grid"),
+		ToggleFill:  bind([]string{"ctrl+f"}, "toggle filled shapes"),
 
 		NextTab:  bind([]string{"tab"}, "next tab"),
 		PrevTab:  bind([]string{"shift+tab"}, "prev tab"),
@@ -146,6 +158,11 @@ func applyOverrides(km *KeyMap, overrides keyOverrides) {
 		"open":            &km.Open,
 		"save":            &km.Save,
 		"save_as":         &km.SaveAs,
+		"export":          &km.Export,
+		"clear":           &km.Clear,
+		"color_picker":    &km.ColorPicker,
+		"toggle_grid":     &km.ToggleGrid,
+		"toggle_fill":     &km.ToggleFill,
 		"next_tab":        &km.NextTab,
 		"prev_tab":        &km.PrevTab,
 		"close_tab":       &km.CloseTab,

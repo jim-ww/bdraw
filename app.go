@@ -70,6 +70,7 @@ const (
 	modeConfirmClose
 	modeConfirmClear
 	modeColorPicker
+	modeNumberEntry
 )
 
 // Model is the whole application state for bubbletea.
@@ -109,6 +110,18 @@ type Model struct {
 	cursorCol, cursorRow int
 	cursorVisible        bool
 
+	// hoverZone is the bubblezone ID currently under the mouse (any zone:
+	// button, tab, swatch), so buttons can highlight on hover.
+	hoverZone string
+
+	showGrid bool
+	filled   bool
+
+	// numberEntry is the shared click-to-type-a-number state, used by both
+	// the size and zoom controls (see numberentry.go).
+	numEntryTarget string
+	numEntryValue  string
+
 	status string
 
 	// cache is a pointer so it survives across the value-receiver
@@ -139,16 +152,17 @@ func NewModel() Model {
 	ti := textinput.New()
 	ti.Prompt = "> "
 	return Model{
-		km:     LoadKeyMap(),
-		cfg:    LoadConfig(),
-		tabs:   []*Document{NewDocument()},
-		active: 0,
-		tool:   ToolBrush,
-		color:  Palette[0],
-		size:   1,
-		input:  ti,
-		cache:  &canvasCache{},
-		status: "mouse to draw · b/r/c/l/e/s/t/m tools · scroll/ctrl+=/- zoom · arrows/middle-drag pan · ctrl+q quit",
+		km:       LoadKeyMap(),
+		cfg:      LoadConfig(),
+		tabs:     []*Document{NewDocument()},
+		active:   0,
+		tool:     ToolBrush,
+		color:    Palette[0],
+		size:     1,
+		input:    ti,
+		cache:    &canvasCache{},
+		showGrid: true,
+		status:   "mouse to draw · b/r/c/l/e/s/t/m tools · scroll/ctrl+=/- zoom · arrows/middle-drag pan · ctrl+q quit",
 	}
 }
 
@@ -172,6 +186,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		if m.mode == modeColorPicker {
 			return m.handleColorPickerKey(msg)
+		}
+		if m.mode == modeNumberEntry {
+			return m.handleNumberEntryKey(msg)
 		}
 		if m.mode != modeNormal {
 			return m.handlePromptKey(msg)

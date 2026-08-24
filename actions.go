@@ -43,19 +43,49 @@ func (m *Model) openColorPicker() {
 	m.input.Focus()
 }
 
+// zoomBy changes zoom around the viewport center.
 func (m *Model) zoomBy(factor float64) {
+	cols, rows := m.canvasSize()
+	m.zoomAt(factor, cols/2, rows/2)
+}
+
+// zoomAt changes zoom while keeping the world point currently under screen
+// cell (col, row) fixed on screen, so zooming in/out tracks the cursor
+// (or, for keyboard zoom, wherever it last was) instead of the view
+// jumping to re-center itself.
+func (m *Model) zoomAt(factor float64, col, row int) {
 	d := m.doc()
 	if d.Zoom == 0 {
 		d.Zoom = 1
 	}
-	d.Zoom *= factor
-	if d.Zoom < zoomMin {
-		d.Zoom = zoomMin
+	worldBefore := m.cellToPoint(col, row)
+
+	newZoom := d.Zoom * factor
+	if newZoom < zoomMin {
+		newZoom = zoomMin
 	}
-	if d.Zoom > zoomMax {
-		d.Zoom = zoomMax
+	if newZoom > zoomMax {
+		newZoom = zoomMax
 	}
+	d.Zoom = newZoom
+
+	sx := float64(col)*SubpixW + SubpixW/2
+	sy := float64(row)*SubpixH + SubpixH/2
+	d.Offset.X = worldBefore.X - sx/newZoom
+	d.Offset.Y = worldBefore.Y - sy/newZoom
+
 	m.status = fmt.Sprintf("zoom %.0f%%", d.Zoom*100)
+}
+
+// zoomAtCursor zooms centered on the last known mouse position, if any,
+// falling back to the viewport center — used by the keyboard zoom keys and
+// the toolbar +/- buttons, which have no mouse position of their own.
+func (m *Model) zoomAtCursor(factor float64) {
+	if m.cursorVisible {
+		m.zoomAt(factor, m.cursorCol, m.cursorRow)
+		return
+	}
+	m.zoomBy(factor)
 }
 
 func (m *Model) panBy(dx, dy float64) {

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"math"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -13,9 +13,14 @@ const selectColor = "#ffaa00"
 var (
 	activeStyle   = lipgloss.NewStyle().Bold(true).Reverse(true).Padding(0, 1)
 	inactiveStyle = lipgloss.NewStyle().Padding(0, 1)
+	hoverStyle    = lipgloss.NewStyle().Underline(true).Padding(0, 1)
 	dimStyle      = lipgloss.NewStyle().Faint(true)
 	modalStyle    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(0, 1)
 )
+
+// gridDotColor is deliberately close to the terminal's black background —
+// barely noticeable, there purely to help line things up.
+const gridDotColor = "#3a3a3a"
 
 func (m Model) View() string {
 	if m.width == 0 {
@@ -80,47 +85,55 @@ func wrapButtons(buttons []string, width int) []string {
 func (m Model) tabLines() []string {
 	var parts []string
 	for i, d := range m.tabs {
-		style := inactiveStyle
-		if i == m.active {
-			style = activeStyle
-		}
-		label := d.Title() + " " + zone.Mark(zoneTabClose(i), "x")
-		parts = append(parts, zone.Mark(zoneTab(i), style.Render(label)))
+		style := m.styleFor(zoneTab(i), i == m.active)
+		closeStyle := m.styleFor(zoneTabClose(i), false)
+		label := style.Render(d.Title()) + " " + zone.Mark(zoneTabClose(i), closeStyle.Render("x"))
+		parts = append(parts, zone.Mark(zoneTab(i), label))
 	}
-	parts = append(parts, zone.Mark(zoneNewTab, inactiveStyle.Render("+")))
+	parts = append(parts, zone.Mark(zoneNewTab, m.styleFor(zoneNewTab, false).Render("+")))
 	return wrapButtons(parts, m.width)
 }
 
-func button(id, label string, active bool) string {
-	style := inactiveStyle
-	if active {
-		style = activeStyle
+// styleFor picks a button's style: active beats hover beats plain, so a
+// button always shows some feedback for what the mouse and keyboard are
+// doing, not just clicks.
+func (m Model) styleFor(id string, active bool) lipgloss.Style {
+	switch {
+	case active:
+		return activeStyle
+	case m.hoverZone == id:
+		return hoverStyle
+	default:
+		return inactiveStyle
 	}
-	return zone.Mark(id, style.Render(label))
+}
+
+func (m Model) button(id, label string, active bool) string {
+	return zone.Mark(id, m.styleFor(id, active).Render(label))
 }
 
 // toolButton renders a tool's toolbar button as its icon glyph when icons
 // are enabled (Config.UseIcons), or its name otherwise — togglable so
 // users who prefer clarity over density can switch back.
 func (m Model) toolButton(id string, t Tool, active bool) string {
-	label := string(t)
+	label := strings.ToUpper(string(t[:1])) + string(t[1:])
 	if m.cfg.UseIcons {
 		label = string(toolCursor[t])
 	}
-	return button(id, label, active)
+	return m.button(id, label, active)
 }
 
 func (m Model) toolbarLines() []string {
 	colorSwatch := lipgloss.NewStyle().Foreground(lipgloss.Color(m.color)).Render("●")
 	buttons := []string{
-		button(zoneNew, "New", false),
-		button(zoneOpen, "Open", false),
-		button(zoneSave, "Save", false),
-		button(zoneSaveAs, "Save As", false),
-		button(zoneExport, "Export", false),
-		button(zoneClear, "Clear", false),
-		button(zoneUndo, "Undo", false),
-		button(zoneRedo, "Redo", false),
+		m.button(zoneNew, "New", false),
+		m.button(zoneOpen, "Open", false),
+		m.button(zoneSave, "Save", false),
+		m.button(zoneSaveAs, "Save As", false),
+		m.button(zoneExport, "Export", false),
+		m.button(zoneClear, "Clear", false),
+		m.button(zoneUndo, "Undo", false),
+		m.button(zoneRedo, "Redo", false),
 		m.toolButton(zoneToolBrush, ToolBrush, m.tool == ToolBrush),
 		m.toolButton(zoneToolRect, ToolRect, m.tool == ToolRect),
 		m.toolButton(zoneToolCircle, ToolCircle, m.tool == ToolCircle),
@@ -130,21 +143,33 @@ func (m Model) toolbarLines() []string {
 		m.toolButton(zoneToolMove, ToolMove, m.tool == ToolMove),
 		m.toolButton(zoneToolFill, ToolFill, m.tool == ToolFill),
 		m.toolButton(zoneToolText, ToolText, m.tool == ToolText),
-		button(zoneColorButton, colorSwatch+" Color", m.mode == modeColorPicker),
-		button(zoneSizeDec, "-", false),
-		inactiveStyle.Render(fmt.Sprintf("size %.0f", m.size)),
-		button(zoneSizeInc, "+", false),
-		button(zoneZoomOut, "-", false),
-		inactiveStyle.Render(fmt.Sprintf("zoom %.0f%%", m.doc().Zoom*100)),
-		button(zoneZoomIn, "+", false),
+		m.button(zoneFilled, "Filled: "+onOff(m.filled), m.filled),
+		m.button(zoneColorButton, colorSwatch+" Color", m.mode == modeColorPicker),
+		m.button(zoneSizeDec, "-", false),
+		m.button(zoneSizeValue, "size "+m.numberEntryLabel("size", "", m.size), m.mode == modeNumberEntry && m.numEntryTarget == "size"),
+		m.button(zoneSizeInc, "+", false),
+		m.button(zoneZoomOut, "-", false),
+		m.button(zoneZoomValue, "zoom "+m.numberEntryLabel("zoom", "%", m.doc().Zoom*100), m.mode == modeNumberEntry && m.numEntryTarget == "zoom"),
+		m.button(zoneZoomIn, "+", false),
+		m.button(zoneGrid, "Grid: "+onOff(m.showGrid), m.showGrid),
 	}
 	return wrapButtons(buttons, m.width)
+}
+
+func onOff(b bool) string {
+	if b {
+		return "on"
+	}
+	return "off"
 }
 
 func (m Model) viewColorPicker() string {
 	var swatches strings.Builder
 	for i, c := range Palette {
 		style := lipgloss.NewStyle().Background(lipgloss.Color(c)).Padding(0, 1)
+		if m.hoverZone == zoneColor(i) {
+			style = style.Underline(true)
+		}
 		label := "  "
 		if c == m.color {
 			label = "[]"
@@ -152,7 +177,8 @@ func (m Model) viewColorPicker() string {
 		swatches.WriteString(zone.Mark(zoneColor(i), style.Render(label)))
 		swatches.WriteString(" ")
 	}
-	body := swatches.String() + "\nhex: " + m.input.View() + dimStyle.Render(" (enter to apply, esc to cancel)")
+	hint := dimStyle.Render(" (enter to apply hex, esc to cancel)")
+	body := swatches.String() + "\nhex: " + m.input.View() + hint
 	return modalStyle.Render(body)
 }
 
@@ -187,6 +213,37 @@ func (m Model) marqueeBounds(offset Point, zoom float64) (x0, y0, x1, y1 int, ok
 		r0, r1 = r1, r0
 	}
 	return c0, r0, c1, r1, true
+}
+
+// gridWorldStep is the dot-grid spacing in world subpixels, like the
+// squares on graph paper — fixed to world coordinates so the dots pan with
+// the canvas instead of the viewport.
+const gridWorldStep = 32
+
+// gridLineInCell reports whether a grid line falls inside the screen-space
+// cell spanning [idx*cellSize-phase, (idx+1)*cellSize-phase). period is the
+// grid's screen-space spacing; if it's smaller than a cell (zoomed out
+// past one grid line per cell) every cell counts as on-grid, since drawing
+// only some of them would look like aliasing noise rather than a grid.
+func gridLineInCell(idx int, cellSize, period, phase float64) bool {
+	if period <= 0 {
+		return false
+	}
+	if period < cellSize {
+		return true
+	}
+	a := float64(idx)*cellSize - phase
+	b := a + cellSize
+	return math.Floor(a/period) != math.Floor(b/period)
+}
+
+// isGridDot reports whether the dot-grid overlay should show at cell
+// (col, row) — purely a drawing aid, computed live and never written into
+// the Raster, so it can never leak into a saved document or an export.
+func isGridDot(col, row int, offset Point, zoom float64) bool {
+	period := gridWorldStep * zoom
+	return gridLineInCell(col, SubpixW, period, offset.X*zoom) &&
+		gridLineInCell(row, SubpixH, period, offset.Y*zoom)
 }
 
 func (m Model) viewCanvas() string {
@@ -250,6 +307,8 @@ func (m Model) viewCanvas() string {
 					ru = '·'
 				}
 				color = selectColor
+			case m.showGrid && ru == ' ' && bg == "" && isGridDot(col, row, d.Offset, zoom):
+				ru, color = '·', gridDotColor
 			}
 
 			key := styleKey{fg: color, bg: bg}

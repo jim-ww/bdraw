@@ -46,6 +46,17 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.doSave()
 	case key.Matches(msg, m.km.SaveAs):
 		m.doSaveAs()
+	case key.Matches(msg, m.km.Export):
+		m.doExport()
+	case key.Matches(msg, m.km.Clear):
+		m.doClearCanvas()
+
+	case key.Matches(msg, m.km.ColorPicker):
+		m.openColorPicker()
+	case key.Matches(msg, m.km.ToggleGrid):
+		m.showGrid = !m.showGrid
+	case key.Matches(msg, m.km.ToggleFill):
+		m.filled = !m.filled
 
 	case key.Matches(msg, m.km.NewTab):
 		m.doNewTab()
@@ -70,9 +81,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.km.PanRight):
 		m.panBy(panStep, 0)
 	case key.Matches(msg, m.km.ZoomIn):
-		m.zoomBy(zoomStep)
+		m.zoomAtCursor(zoomStep)
 	case key.Matches(msg, m.km.ZoomOut):
-		m.zoomBy(1 / zoomStep)
+		m.zoomAtCursor(1 / zoomStep)
 	}
 	return m, nil
 }

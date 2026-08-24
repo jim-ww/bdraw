@@ -20,6 +20,10 @@ func eraserRadius(size float64) float64 {
 const selectTolerance = 6
 
 func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	if msg.Action == tea.MouseActionMotion {
+		m.hoverZone = m.zoneAt(msg)
+	}
+
 	if msg.Button == tea.MouseButtonWheelUp || msg.Button == tea.MouseButtonWheelDown {
 		return m.handleWheel(msg)
 	}
@@ -64,11 +68,18 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// handleWheel zooms in/out centered on the cursor's world position (if the
+// wheel event landed on the canvas) so the point under the mouse stays put
+// instead of the view re-centering somewhere else.
 func (m *Model) handleWheel(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	if msg.Button == tea.MouseButtonWheelUp {
-		m.zoomBy(zoomStep)
+	factor := zoomStep
+	if msg.Button == tea.MouseButtonWheelDown {
+		factor = 1 / zoomStep
+	}
+	if col, row, ok := m.canvasCell(msg); ok {
+		m.zoomAt(factor, col, row)
 	} else {
-		m.zoomBy(1 / zoomStep)
+		m.zoomBy(factor)
 	}
 	return *m, nil
 }

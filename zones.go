@@ -61,8 +61,12 @@ const (
 	zoneToolMove   = "tool-move"
 	zoneToolFill   = "tool-fill"
 
-	zoneSizeInc = "size-inc"
-	zoneSizeDec = "size-dec"
+	zoneSizeInc   = "size-inc"
+	zoneSizeDec   = "size-dec"
+	zoneSizeValue = "size-value"
+	zoneZoomValue = "zoom-value"
+	zoneGrid      = "grid"
+	zoneFilled    = "filled"
 
 	zoneColorButton = "color-button"
 	zoneZoomIn      = "zoom-in"
@@ -82,8 +86,8 @@ func (m Model) zoneIDs() []string {
 		zoneNew, zoneOpen, zoneSave, zoneSaveAs, zoneExport, zoneClear, zoneUndo, zoneRedo,
 		zoneToolBrush, zoneToolRect, zoneToolCircle, zoneToolLine,
 		zoneToolEraser, zoneToolSelect, zoneToolText, zoneToolMove, zoneToolFill,
-		zoneSizeInc, zoneSizeDec, zoneColorButton, zoneZoomIn, zoneZoomOut,
-		zoneNewTab,
+		zoneSizeInc, zoneSizeDec, zoneSizeValue, zoneColorButton, zoneZoomIn, zoneZoomOut, zoneZoomValue,
+		zoneGrid, zoneFilled, zoneNewTab,
 	}
 	if m.mode == modeColorPicker {
 		for i := range Palette {
@@ -97,6 +101,10 @@ func (m Model) zoneIDs() []string {
 }
 
 func (m Model) handleZoneClick(id string) (tea.Model, tea.Cmd) {
+	if m.mode == modeNumberEntry && id != zoneSizeValue && id != zoneZoomValue {
+		m.mode = modeNormal
+	}
+
 	if m.mode == modeColorPicker {
 		for i := range Palette {
 			if id == zoneColor(i) {
@@ -149,12 +157,20 @@ func (m Model) handleZoneClick(id string) (tea.Model, tea.Cmd) {
 		m.sizeInc()
 	case zoneSizeDec:
 		m.sizeDec()
+	case zoneSizeValue:
+		m.startNumberEntry("size", m.size)
 	case zoneColorButton:
 		m.openColorPicker()
 	case zoneZoomIn:
-		m.zoomBy(zoomStep)
+		m.zoomAtCursor(zoomStep)
 	case zoneZoomOut:
-		m.zoomBy(1 / zoomStep)
+		m.zoomAtCursor(1 / zoomStep)
+	case zoneZoomValue:
+		m.startNumberEntry("zoom", m.doc().Zoom*100)
+	case zoneGrid:
+		m.showGrid = !m.showGrid
+	case zoneFilled:
+		m.filled = !m.filled
 	case zoneNewTab:
 		m.doNewTab()
 
