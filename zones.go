@@ -41,6 +41,8 @@ const (
 	zoneOpen   = "open"
 	zoneSave   = "save"
 	zoneSaveAs = "saveas"
+	zoneExport = "export"
+	zoneClear  = "clear"
 	zoneUndo   = "undo"
 	zoneRedo   = "redo"
 
@@ -72,7 +74,7 @@ func zoneTabClose(i int) string { return fmt.Sprintf("tabclose-%d", i) }
 // hit-testing mouse events against them.
 func (m Model) zoneIDs() []string {
 	ids := []string{
-		zoneNew, zoneOpen, zoneSave, zoneSaveAs, zoneUndo, zoneRedo,
+		zoneNew, zoneOpen, zoneSave, zoneSaveAs, zoneExport, zoneClear, zoneUndo, zoneRedo,
 		zoneToolBrush, zoneToolRect, zoneToolCircle, zoneToolLine,
 		zoneToolEraser, zoneToolSelect, zoneToolText, zoneToolMove, zoneToolFill,
 		zoneSizeInc, zoneSizeDec, zoneColorButton, zoneZoomIn, zoneZoomOut,
@@ -110,6 +112,10 @@ func (m Model) handleZoneClick(id string) (tea.Model, tea.Cmd) {
 		m.doSave()
 	case zoneSaveAs:
 		m.doSaveAs()
+	case zoneExport:
+		m.doExport()
+	case zoneClear:
+		m.doClearCanvas()
 	case zoneUndo:
 		m.doUndo()
 	case zoneRedo:

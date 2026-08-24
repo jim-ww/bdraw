@@ -21,9 +21,10 @@ type KeyMap struct {
 	ToolMove   key.Binding
 	ToolFill   key.Binding
 
-	Undo   key.Binding
-	Redo   key.Binding
-	Delete key.Binding
+	Undo           key.Binding
+	Redo           key.Binding
+	Delete         key.Binding
+	ClearSelection key.Binding
 
 	New    key.Binding
 	Open   key.Binding
@@ -57,7 +58,7 @@ func DefaultKeyMap() KeyMap {
 	return KeyMap{
 		ToolBrush:  bind([]string{"b"}, "brush"),
 		ToolRect:   bind([]string{"r"}, "rectangle"),
-		ToolCircle: bind([]string{"c"}, "circle"),
+		ToolCircle: bind([]string{"o", "c"}, "oval"),
 		ToolLine:   bind([]string{"l"}, "line"),
 		ToolEraser: bind([]string{"e"}, "eraser"),
 		ToolSelect: bind([]string{"s"}, "select"),
@@ -65,9 +66,10 @@ func DefaultKeyMap() KeyMap {
 		ToolMove:   bind([]string{"m"}, "move"),
 		ToolFill:   bind([]string{"f"}, "fill"),
 
-		Undo:   bind([]string{"ctrl+z"}, "undo"),
-		Redo:   bind([]string{"ctrl+shift+z", "ctrl+y"}, "redo"),
-		Delete: bind([]string{"delete", "backspace"}, "delete selection"),
+		Undo:           bind([]string{"ctrl+z"}, "undo"),
+		Redo:           bind([]string{"ctrl+shift+z", "ctrl+y"}, "redo"),
+		Delete:         bind([]string{"delete", "backspace"}, "delete selection"),
+		ClearSelection: bind([]string{"esc"}, "deselect"),
 
 		New:    bind([]string{"ctrl+n"}, "new"),
 		Open:   bind([]string{"ctrl+o"}, "open"),
@@ -127,35 +129,36 @@ func keymapConfigPath() (string, error) {
 
 func applyOverrides(km *KeyMap, overrides keyOverrides) {
 	fields := map[string]*key.Binding{
-		"tool_brush":  &km.ToolBrush,
-		"tool_rect":   &km.ToolRect,
-		"tool_circle": &km.ToolCircle,
-		"tool_line":   &km.ToolLine,
-		"tool_eraser": &km.ToolEraser,
-		"tool_select": &km.ToolSelect,
-		"tool_text":   &km.ToolText,
-		"tool_move":   &km.ToolMove,
-		"tool_fill":   &km.ToolFill,
-		"undo":        &km.Undo,
-		"redo":        &km.Redo,
-		"delete":      &km.Delete,
-		"new":         &km.New,
-		"open":        &km.Open,
-		"save":        &km.Save,
-		"save_as":     &km.SaveAs,
-		"next_tab":    &km.NextTab,
-		"prev_tab":    &km.PrevTab,
-		"close_tab":   &km.CloseTab,
-		"new_tab":     &km.NewTab,
-		"size_inc":    &km.SizeInc,
-		"size_dec":    &km.SizeDec,
-		"pan_up":      &km.PanUp,
-		"pan_down":    &km.PanDown,
-		"pan_left":    &km.PanLeft,
-		"pan_right":   &km.PanRight,
-		"zoom_in":     &km.ZoomIn,
-		"zoom_out":    &km.ZoomOut,
-		"quit":        &km.Quit,
+		"tool_brush":      &km.ToolBrush,
+		"tool_rect":       &km.ToolRect,
+		"tool_circle":     &km.ToolCircle,
+		"tool_line":       &km.ToolLine,
+		"tool_eraser":     &km.ToolEraser,
+		"tool_select":     &km.ToolSelect,
+		"tool_text":       &km.ToolText,
+		"tool_move":       &km.ToolMove,
+		"tool_fill":       &km.ToolFill,
+		"undo":            &km.Undo,
+		"redo":            &km.Redo,
+		"delete":          &km.Delete,
+		"clear_selection": &km.ClearSelection,
+		"new":             &km.New,
+		"open":            &km.Open,
+		"save":            &km.Save,
+		"save_as":         &km.SaveAs,
+		"next_tab":        &km.NextTab,
+		"prev_tab":        &km.PrevTab,
+		"close_tab":       &km.CloseTab,
+		"new_tab":         &km.NewTab,
+		"size_inc":        &km.SizeInc,
+		"size_dec":        &km.SizeDec,
+		"pan_up":          &km.PanUp,
+		"pan_down":        &km.PanDown,
+		"pan_left":        &km.PanLeft,
+		"pan_right":       &km.PanRight,
+		"zoom_in":         &km.ZoomIn,
+		"zoom_out":        &km.ZoomOut,
+		"quit":            &km.Quit,
 	}
 	for name, keys := range overrides {
 		b, ok := fields[name]

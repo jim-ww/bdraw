@@ -21,6 +21,15 @@ func (m Model) handlePromptKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	if m.mode == modeConfirmClear {
+		switch msg.String() {
+		case "y", "enter":
+			m.clearCanvas()
+		}
+		m.mode = modeNormal
+		return m, nil
+	}
+
 	switch msg.String() {
 	case "esc":
 		m.mode = modeNormal

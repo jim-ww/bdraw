@@ -35,6 +35,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.doRedo()
 	case key.Matches(msg, m.km.Delete):
 		m.doDeleteSelected()
+	case key.Matches(msg, m.km.ClearSelection):
+		m.clearSelection()
 
 	case key.Matches(msg, m.km.New):
 		m.doNew()

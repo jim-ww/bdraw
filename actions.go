@@ -1,6 +1,10 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"path/filepath"
+	"strings"
+)
 
 func (m *Model) setTool(t Tool) {
 	m.tool = t
@@ -11,31 +15,25 @@ func (m *Model) setColor(c string) {
 	m.color = c
 }
 
+// sizeInc/sizeDec step brush size multiplicatively rather than through a
+// short fixed list, so there's no arbitrary ceiling on how fat a brush can
+// get: repeated presses keep scaling it up to sizeMax.
 func (m *Model) sizeInc() {
-	m.setSizeIndex(m.sizeIndex() + 1)
+	m.setSize(m.size * sizeStep)
 }
 
 func (m *Model) sizeDec() {
-	m.setSizeIndex(m.sizeIndex() - 1)
+	m.setSize(m.size / sizeStep)
 }
 
-func (m *Model) sizeIndex() int {
-	for i, s := range Sizes {
-		if s == m.size {
-			return i
-		}
+func (m *Model) setSize(s float64) {
+	if s < sizeMin {
+		s = sizeMin
 	}
-	return 0
-}
-
-func (m *Model) setSizeIndex(i int) {
-	if i < 0 {
-		i = 0
+	if s > sizeMax {
+		s = sizeMax
 	}
-	if i >= len(Sizes) {
-		i = len(Sizes) - 1
-	}
-	m.size = Sizes[i]
+	m.size = s
 }
 
 func (m *Model) openColorPicker() {
@@ -152,6 +150,39 @@ func (m *Model) doSaveAs() {
 
 func (m *Model) doOpen() {
 	m.startPrompt(modePromptOpen, "")
+}
+
+// doExport opens the save-as prompt prefilled with a .png path, since a
+// plain "Save" button doesn't make the PNG export option discoverable.
+func (m *Model) doExport() {
+	base := m.doc().Path
+	if base == "" {
+		base = "untitled"
+	}
+	base = strings.TrimSuffix(base, filepath.Ext(base))
+	m.startPrompt(modePromptSaveAs, base+".png")
+}
+
+// doClearCanvas empties the current document, prompting for confirmation
+// first unless it's already empty.
+func (m *Model) doClearCanvas() {
+	if len(m.doc().Edits) == 0 {
+		return
+	}
+	m.mode = modeConfirmClear
+}
+
+func (m *Model) clearCanvas() {
+	d := m.doc()
+	d.BeginChange()
+	d.Edits = nil
+}
+
+// clearSelection deselects every edit (esc, select tool).
+func (m *Model) clearSelection() {
+	for _, e := range m.doc().Edits {
+		e.Selected = false
+	}
 }
 
 func (m *Model) saveTo(path string) {

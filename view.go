@@ -99,6 +99,17 @@ func button(id, label string, active bool) string {
 	return zone.Mark(id, style.Render(label))
 }
 
+// toolButton renders a tool's toolbar button as its icon glyph when icons
+// are enabled (Config.UseIcons), or its name otherwise — togglable so
+// users who prefer clarity over density can switch back.
+func (m Model) toolButton(id string, t Tool, active bool) string {
+	label := string(t)
+	if m.cfg.UseIcons {
+		label = string(toolCursor[t])
+	}
+	return button(id, label, active)
+}
+
 func (m Model) toolbarLines() []string {
 	colorSwatch := lipgloss.NewStyle().Foreground(lipgloss.Color(m.color)).Render("●")
 	buttons := []string{
@@ -106,17 +117,19 @@ func (m Model) toolbarLines() []string {
 		button(zoneOpen, "Open", false),
 		button(zoneSave, "Save", false),
 		button(zoneSaveAs, "Save As", false),
+		button(zoneExport, "Export", false),
+		button(zoneClear, "Clear", false),
 		button(zoneUndo, "Undo", false),
 		button(zoneRedo, "Redo", false),
-		button(zoneToolBrush, "Brush", m.tool == ToolBrush),
-		button(zoneToolRect, "Rect", m.tool == ToolRect),
-		button(zoneToolCircle, "Oval", m.tool == ToolCircle),
-		button(zoneToolLine, "Line", m.tool == ToolLine),
-		button(zoneToolEraser, "Eraser", m.tool == ToolEraser),
-		button(zoneToolSelect, "Select", m.tool == ToolSelect),
-		button(zoneToolMove, "Move", m.tool == ToolMove),
-		button(zoneToolFill, "Fill", m.tool == ToolFill),
-		button(zoneToolText, "Text", m.tool == ToolText),
+		m.toolButton(zoneToolBrush, ToolBrush, m.tool == ToolBrush),
+		m.toolButton(zoneToolRect, ToolRect, m.tool == ToolRect),
+		m.toolButton(zoneToolCircle, ToolCircle, m.tool == ToolCircle),
+		m.toolButton(zoneToolLine, ToolLine, m.tool == ToolLine),
+		m.toolButton(zoneToolEraser, ToolEraser, m.tool == ToolEraser),
+		m.toolButton(zoneToolSelect, ToolSelect, m.tool == ToolSelect),
+		m.toolButton(zoneToolMove, ToolMove, m.tool == ToolMove),
+		m.toolButton(zoneToolFill, ToolFill, m.tool == ToolFill),
+		m.toolButton(zoneToolText, ToolText, m.tool == ToolText),
 		button(zoneColorButton, colorSwatch+" Color", m.mode == modeColorPicker),
 		button(zoneSizeDec, "-", false),
 		inactiveStyle.Render(fmt.Sprintf("size %.0f", m.size)),
@@ -226,6 +239,8 @@ func (m Model) viewStatus() string {
 		return "text: " + m.input.View()
 	case modeConfirmClose:
 		return "unsaved changes — close anyway? (y/n)"
+	case modeConfirmClear:
+		return "clear the whole canvas? (y/n)"
 	}
 	return dimStyle.Render(m.status)
 }

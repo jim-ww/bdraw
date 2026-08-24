@@ -44,7 +44,11 @@ var Palette = []string{
 	"#000000",
 }
 
-var Sizes = []float64{1, 2, 3, 4, 5}
+const (
+	sizeMin  = 1.0
+	sizeMax  = 200.0
+	sizeStep = 1.4 // multiplicative, so size scales smoothly from hairline to very fat
+)
 
 const (
 	zoomMin  = 0.25
@@ -64,12 +68,14 @@ const (
 	modePromptSaveAs
 	modePromptOpen
 	modeConfirmClose
+	modeConfirmClear
 	modeColorPicker
 )
 
 // Model is the whole application state for bubbletea.
 type Model struct {
-	km KeyMap
+	km  KeyMap
+	cfg Config
 
 	tabs   []*Document
 	active int
@@ -109,6 +115,7 @@ func NewModel() Model {
 	ti.Prompt = "> "
 	return Model{
 		km:     LoadKeyMap(),
+		cfg:    LoadConfig(),
 		tabs:   []*Document{NewDocument()},
 		active: 0,
 		tool:   ToolBrush,
