@@ -93,7 +93,7 @@ func DefaultKeyMap() KeyMap {
 		CloseTab: bind([]string{"ctrl+w"}, "close tab"),
 		NewTab:   bind([]string{"ctrl+t"}, "new tab"),
 
-		SizeInc: bind([]string{"+"}, "size up"),
+		SizeInc: bind([]string{"+", "="}, "size up"),
 		SizeDec: bind([]string{"-"}, "size down"),
 
 		PanUp:    bind([]string{"up"}, "pan up"),

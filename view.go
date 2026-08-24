@@ -13,7 +13,7 @@ const selectColor = "#ffaa00"
 var (
 	activeStyle   = lipgloss.NewStyle().Bold(true).Reverse(true).Padding(0, 1)
 	inactiveStyle = lipgloss.NewStyle().Padding(0, 1)
-	hoverStyle    = lipgloss.NewStyle().Underline(true).Padding(0, 1)
+	hoverStyle    = lipgloss.NewStyle().Background(lipgloss.Color("#444444")).Padding(0, 1)
 	dimStyle      = lipgloss.NewStyle().Faint(true)
 	modalStyle    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(0, 1)
 )
@@ -39,6 +39,10 @@ func (m Model) View() string {
 		b.WriteString(m.viewColorPicker())
 		b.WriteString("\n")
 	}
+	if m.mode == modeNumberEntry {
+		b.WriteString(m.viewNumberSlider())
+		b.WriteString("\n")
+	}
 	b.WriteString(m.viewCanvas())
 	b.WriteString("\n")
 	b.WriteString(m.viewStatus())
@@ -52,6 +56,9 @@ func (m Model) headerHeight() int {
 	h := len(m.tabLines()) + len(m.toolbarLines())
 	if m.mode == modeColorPicker {
 		h += strings.Count(m.viewColorPicker(), "\n") + 1
+	}
+	if m.mode == modeNumberEntry {
+		h += strings.Count(m.viewNumberSlider(), "\n") + 1
 	}
 	return h
 }
@@ -215,10 +222,26 @@ func (m Model) marqueeBounds(offset Point, zoom float64) (x0, y0, x1, y1 int, ok
 	return c0, r0, c1, r1, true
 }
 
-// gridWorldStep is the dot-grid spacing in world subpixels, like the
-// squares on graph paper — fixed to world coordinates so the dots pan with
-// the canvas instead of the viewport.
-const gridWorldStep = 32
+// gridTargetScreenSpacing is roughly how far apart, in screen subpixels,
+// the grid dots should appear regardless of zoom.
+const gridTargetScreenSpacing = 16
+
+// adaptiveGridWorldStep picks the world-space dot spacing so its on-screen
+// spacing stays near gridTargetScreenSpacing at any zoom — a fixed world
+// step either vanished (too many world-units per screen dot at high zoom)
+// or turned into visual noise (too few at low zoom). Snapping to a power
+// of 2 keeps the step from jittering continuously as zoom changes.
+func adaptiveGridWorldStep(zoom float64) float64 {
+	if zoom <= 0 {
+		zoom = 1
+	}
+	raw := gridTargetScreenSpacing / zoom
+	step := math.Pow(2, math.Round(math.Log2(raw)))
+	if step < 1 {
+		step = 1
+	}
+	return step
+}
 
 // gridLineInCell reports whether a grid line falls inside the screen-space
 // cell spanning [idx*cellSize-phase, (idx+1)*cellSize-phase). period is the
@@ -241,7 +264,7 @@ func gridLineInCell(idx int, cellSize, period, phase float64) bool {
 // (col, row) — purely a drawing aid, computed live and never written into
 // the Raster, so it can never leak into a saved document or an export.
 func isGridDot(col, row int, offset Point, zoom float64) bool {
-	period := gridWorldStep * zoom
+	period := adaptiveGridWorldStep(zoom) * zoom
 	return gridLineInCell(col, SubpixW, period, offset.X*zoom) &&
 		gridLineInCell(row, SubpixH, period, offset.Y*zoom)
 }
@@ -339,6 +362,11 @@ func (m Model) viewStatus() string {
 		return "unsaved changes — close anyway? (y/n)"
 	case modeConfirmClear:
 		return "clear the whole canvas? (y/n)"
+	case modeNumberEntry:
+		return ""
+	}
+	if tip := m.tooltip(m.hoverZone); tip != "" {
+		return dimStyle.Render(tip)
 	}
 	return dimStyle.Render(m.status)
 }

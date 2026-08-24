@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"strconv"
 	"strings"
 
@@ -62,4 +63,53 @@ func (m Model) numberEntryLabel(target, suffix string, current float64) string {
 		return m.numEntryValue + "_"
 	}
 	return strconv.FormatFloat(current, 'f', 0, 64) + suffix
+}
+
+const sliderWidth = 30
+
+// viewNumberSlider renders the little modal shown below the size/zoom
+// control while typing: a min-to-max slider tracking the in-progress
+// value, on a log scale since both size and zoom are multiplicative
+// ranges (1..200, 25%..800%) where a linear slider would waste most of its
+// width on the low end.
+func (m Model) viewNumberSlider() string {
+	var lo, hi float64
+	var label string
+	switch m.numEntryTarget {
+	case "size":
+		lo, hi, label = sizeMin, sizeMax, "size"
+	case "zoom":
+		lo, hi, label = zoomMin*100, zoomMax*100, "zoom"
+	default:
+		return ""
+	}
+
+	value, err := strconv.ParseFloat(m.numEntryValue, 64)
+	if err != nil {
+		value = lo
+	}
+	if value < lo {
+		value = lo
+	}
+	if value > hi {
+		value = hi
+	}
+
+	frac := (math.Log(value) - math.Log(lo)) / (math.Log(hi) - math.Log(lo))
+	pos := int(frac * float64(sliderWidth-1))
+
+	var bar strings.Builder
+	bar.WriteByte('[')
+	for i := 0; i < sliderWidth; i++ {
+		if i == pos {
+			bar.WriteRune('●')
+		} else {
+			bar.WriteByte('-')
+		}
+	}
+	bar.WriteByte(']')
+
+	body := label + " " + bar.String() + "\n" +
+		dimStyle.Render("type digits, enter to confirm, esc to cancel")
+	return modalStyle.Render(body)
 }

@@ -276,7 +276,12 @@ func (r *Raster) drawEllipse(pts []Point, size float64, color string) {
 	}
 	cx, cy := (pts[0].X+pts[1].X)/2, (pts[0].Y+pts[1].Y)/2
 	rx, ry := math.Abs(pts[1].X-pts[0].X)/2, math.Abs(pts[1].Y-pts[0].Y)/2
-	steps := int(math.Max(16, (rx+ry)*2))
+	// Sample count scales with screen-space radius so curves stay smooth,
+	// but is capped to the viewport's own size: past that, most of the
+	// ellipse is off-screen anyway, and an uncapped radius (a big circle
+	// at high zoom) turned this into tens of thousands of drawSegment
+	// calls per frame — the "circles + zoom get super slow" report.
+	steps := int(math.Max(16, math.Min((rx+ry)*2, r.maxSteps())))
 	prevX, prevY := cx+rx, cy
 	for i := 1; i <= steps; i++ {
 		t := 2 * math.Pi * float64(i) / float64(steps)
@@ -284,6 +289,13 @@ func (r *Raster) drawEllipse(pts []Point, size float64, color string) {
 		r.drawSegment(prevX, prevY, x, y, size, color)
 		prevX, prevY = x, y
 	}
+}
+
+// maxSteps bounds any per-edit sampling loop to the viewport's own
+// resolution: no drawing operation can usefully touch more subpixels than
+// that in one pass, however far its geometry actually extends off-screen.
+func (r *Raster) maxSteps() float64 {
+	return float64(r.Cols*SubpixW+r.Rows*SubpixH) * 2
 }
 
 func (r *Raster) drawText(pts []Point, text string, color string) {
@@ -305,17 +317,67 @@ func (r *Raster) drawText(pts []Point, text string, color string) {
 
 // drawSegment rasterizes a line between two points in screen subpixel
 // space, thickened to size subpixels, using a Bresenham-style walk plus a
-// splat at each step to give it width.
+// splat at each step to give it width. The segment is first clipped to the
+// (padded) viewport: without that, a shape whose endpoints are far
+// off-screen — the near-inevitable case once you're zoomed into a small
+// part of a big shape — makes steps enormous even though almost none of
+// it is ever visible, which was the real source of both the zoomed-in
+// slowdown and edges rendering while a huge fill's outline never finished.
 func (r *Raster) drawSegment(x0, y0, x1, y1, size float64, color string) {
-	steps := int(math.Max(math.Abs(x1-x0), math.Abs(y1-y0)))
+	pad := size + 2
+	maxX, maxY := float64(r.Cols*SubpixW), float64(r.Rows*SubpixH)
+	cx0, cy0, cx1, cy1, visible := clipSegment(x0, y0, x1, y1, -pad, -pad, maxX+pad, maxY+pad)
+	if !visible {
+		return
+	}
+	steps := int(math.Max(math.Abs(cx1-cx0), math.Abs(cy1-cy0)))
 	if steps == 0 {
-		r.plotThick(x0, y0, size, color)
+		r.plotThick(cx0, cy0, size, color)
 		return
 	}
 	for i := 0; i <= steps; i++ {
 		t := float64(i) / float64(steps)
-		r.plotThick(x0+(x1-x0)*t, y0+(y1-y0)*t, size, color)
+		r.plotThick(cx0+(cx1-cx0)*t, cy0+(cy1-cy0)*t, size, color)
 	}
+}
+
+// clipSegment clips segment (x0,y0)-(x1,y1) to the box [minX,minY]-[maxX,maxY]
+// using the Liang-Barsky algorithm. visible is false if the segment misses
+// the box entirely.
+func clipSegment(x0, y0, x1, y1, minX, minY, maxX, maxY float64) (cx0, cy0, cx1, cy1 float64, visible bool) {
+	dx, dy := x1-x0, y1-y0
+	tMin, tMax := 0.0, 1.0
+	edges := [4]struct{ p, q float64 }{
+		{-dx, x0 - minX},
+		{dx, maxX - x0},
+		{-dy, y0 - minY},
+		{dy, maxY - y0},
+	}
+	for _, e := range edges {
+		if e.p == 0 {
+			if e.q < 0 {
+				return 0, 0, 0, 0, false
+			}
+			continue
+		}
+		t := e.q / e.p
+		if e.p < 0 {
+			if t > tMax {
+				return 0, 0, 0, 0, false
+			}
+			if t > tMin {
+				tMin = t
+			}
+		} else {
+			if t < tMin {
+				return 0, 0, 0, 0, false
+			}
+			if t < tMax {
+				tMax = t
+			}
+		}
+	}
+	return x0 + tMin*dx, y0 + tMin*dy, x0 + tMax*dx, y0 + tMax*dy, true
 }
 
 // plotThick lights subpixels within radius size/2 of (x, y).

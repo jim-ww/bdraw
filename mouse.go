@@ -213,6 +213,14 @@ func (m *Model) toolDrag(pt Point) (tea.Model, tea.Cmd) {
 		m.doc().Touch()
 	case ToolSelect:
 		m.selectLast = pt
+		// Highlight whatever the marquee currently covers as you drag,
+		// not just once you release — but only once it's actually a
+		// marquee (past the click threshold), so a small jitter before a
+		// deliberate click doesn't flash the selection.
+		if distance(m.selectStart, m.selectLast) >= selectDragThreshold {
+			m.selectRect(m.selectStart, m.selectLast)
+			m.doc().Touch()
+		}
 	}
 	return *m, nil
 }
@@ -235,10 +243,9 @@ func (m *Model) toolUp(pt Point) (tea.Model, tea.Cmd) {
 			if e := m.nearestEdit(pt, selectTolerance); e != nil {
 				e.Selected = !e.Selected
 			}
-		} else {
-			m.selectRect(m.selectStart, m.selectLast)
+			m.doc().Touch()
 		}
-		m.doc().Touch()
+		// else: selectRect was already applied live during the drag.
 	}
 	m.dragging = false
 	m.dragEdit = nil
