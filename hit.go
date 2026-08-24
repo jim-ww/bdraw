@@ -10,8 +10,14 @@ func (e *Edit) Distance(p Point) float64 {
 	case KindStroke, KindLine:
 		return polylineDistance(e.Points, p)
 	case KindRect:
+		if e.Filled && pointInRect(e.Points, p) {
+			return 0
+		}
 		return rectOutlineDistance(e.Points, p)
 	case KindCircle:
+		if e.Filled && pointInEllipse(e.Points, p) {
+			return 0
+		}
 		return circleOutlineDistance(e.Points, p)
 	case KindText, KindFill:
 		if len(e.Points) == 0 {
@@ -74,6 +80,28 @@ func rectOutlineDistance(pts []Point, p Point) float64 {
 		}
 	}
 	return min
+}
+
+func pointInRect(pts []Point, p Point) bool {
+	if len(pts) < 2 {
+		return false
+	}
+	x0, x1 := math.Min(pts[0].X, pts[1].X), math.Max(pts[0].X, pts[1].X)
+	y0, y1 := math.Min(pts[0].Y, pts[1].Y), math.Max(pts[0].Y, pts[1].Y)
+	return p.X >= x0 && p.X <= x1 && p.Y >= y0 && p.Y <= y1
+}
+
+func pointInEllipse(pts []Point, p Point) bool {
+	if len(pts) < 2 {
+		return false
+	}
+	cx, cy := (pts[0].X+pts[1].X)/2, (pts[0].Y+pts[1].Y)/2
+	rx, ry := math.Abs(pts[1].X-pts[0].X)/2, math.Abs(pts[1].Y-pts[0].Y)/2
+	if rx == 0 || ry == 0 {
+		return false
+	}
+	nx, ny := (p.X-cx)/rx, (p.Y-cy)/ry
+	return nx*nx+ny*ny <= 1
 }
 
 // circleOutlineDistance approximates distance to an ellipse's outline

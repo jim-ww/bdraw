@@ -27,6 +27,7 @@ type Edit struct {
 	Color  string  `json:"color"`
 	Size   float64 `json:"size"`
 	Text   string  `json:"text,omitempty"`
+	Filled bool    `json:"filled,omitempty"` // rect/circle only: solid interior instead of outline
 
 	// Selected is UI-only state (select tool) and is never persisted.
 	Selected bool `json:"-"`

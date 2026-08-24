@@ -173,11 +173,75 @@ func (r *Raster) drawEdit(e *Edit, ox, oy, zoom float64, color string) {
 	case KindStroke, KindLine:
 		r.drawPolyline(pts, size, color)
 	case KindRect:
+		if e.Filled {
+			r.fillRect(pts, color)
+		}
 		r.drawRect(pts, size, color)
 	case KindCircle:
+		if e.Filled {
+			r.fillEllipse(pts, color)
+		}
 		r.drawEllipse(pts, size, color)
 	case KindText:
 		r.drawText(pts, e.Text, color)
+	}
+}
+
+// fillRect paints the background of every cell inside the rect's bounding
+// box. Drawn before the outline stroke so the border stays crisp on top.
+func (r *Raster) fillRect(pts []Point, color string) {
+	if len(pts) < 2 {
+		return
+	}
+	x0, x1 := math.Min(pts[0].X, pts[1].X), math.Max(pts[0].X, pts[1].X)
+	y0, y1 := math.Min(pts[0].Y, pts[1].Y), math.Max(pts[0].Y, pts[1].Y)
+	r.fillCellRange(x0, y0, x1, y1, color, func(float64, float64) bool { return true })
+}
+
+// fillEllipse paints the background of every cell whose center falls
+// inside the ellipse inscribed in pts' bounding box.
+func (r *Raster) fillEllipse(pts []Point, color string) {
+	if len(pts) < 2 {
+		return
+	}
+	x0, x1 := math.Min(pts[0].X, pts[1].X), math.Max(pts[0].X, pts[1].X)
+	y0, y1 := math.Min(pts[0].Y, pts[1].Y), math.Max(pts[0].Y, pts[1].Y)
+	cx, cy := (x0+x1)/2, (y0+y1)/2
+	rx, ry := (x1-x0)/2, (y1-y0)/2
+	inside := func(x, y float64) bool {
+		if rx == 0 || ry == 0 {
+			return false
+		}
+		nx, ny := (x-cx)/rx, (y-cy)/ry
+		return nx*nx+ny*ny <= 1
+	}
+	r.fillCellRange(x0, y0, x1, y1, color, inside)
+}
+
+// fillCellRange sets bg on every cell within the screen-space box
+// [x0,y0]-[x1,y1] whose center passes the inside test.
+func (r *Raster) fillCellRange(x0, y0, x1, y1 float64, color string, inside func(x, y float64) bool) {
+	colFrom, colTo := int(x0/SubpixW), int(x1/SubpixW)
+	rowFrom, rowTo := int(y0/SubpixH), int(y1/SubpixH)
+	if colFrom < 0 {
+		colFrom = 0
+	}
+	if rowFrom < 0 {
+		rowFrom = 0
+	}
+	if colTo >= r.Cols {
+		colTo = r.Cols - 1
+	}
+	if rowTo >= r.Rows {
+		rowTo = r.Rows - 1
+	}
+	for row := rowFrom; row <= rowTo; row++ {
+		for col := colFrom; col <= colTo; col++ {
+			cx, cy := float64(col)*SubpixW+SubpixW/2, float64(row)*SubpixH+SubpixH/2
+			if inside(cx, cy) {
+				r.at(col, row).bg = color
+			}
+		}
 	}
 }
 

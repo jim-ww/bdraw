@@ -131,7 +131,7 @@ func (m *Model) toolDown(pt Point) (tea.Model, tea.Cmd) {
 	case ToolLine, ToolRect, ToolCircle:
 		d.BeginChange()
 		kind := map[Tool]Kind{ToolLine: KindLine, ToolRect: KindRect, ToolCircle: KindCircle}[m.tool]
-		e := &Edit{ID: d.NextID(), Kind: kind, Points: []Point{pt, pt}, Color: m.color, Size: m.size}
+		e := &Edit{ID: d.NextID(), Kind: kind, Points: []Point{pt, pt}, Color: m.color, Size: m.size, Filled: m.filled}
 		d.Edits = append(d.Edits, e)
 		m.dragEdit, m.dragging = e, true
 
