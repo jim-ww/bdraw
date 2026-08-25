@@ -2,3 +2,5 @@
 *.test
 test.json
 result/
+# Added by goreleaser init:
+dist/
