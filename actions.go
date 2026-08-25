@@ -41,6 +41,7 @@ func (m *Model) setSize(s float64) {
 
 func (m *Model) openColorPicker() {
 	m.mode = modeColorPicker
+	m.colorPickerFocus = -1
 	m.input.SetValue(m.color)
 	m.input.CursorEnd()
 	m.input.Focus()

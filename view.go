@@ -234,7 +234,7 @@ func (m Model) viewColorPicker() string {
 	var swatches strings.Builder
 	for i, c := range Palette {
 		style := lipgloss.NewStyle().Background(lipgloss.Color(c)).Padding(0, 1)
-		if m.hoverZone == zoneColor(i) {
+		if m.hoverZone == zoneColor(i) || m.colorPickerFocus == i {
 			style = style.Underline(true)
 		}
 		label := "  "
@@ -244,7 +244,7 @@ func (m Model) viewColorPicker() string {
 		swatches.WriteString(zone.Mark(zoneColor(i), style.Render(label)))
 		swatches.WriteString(" ")
 	}
-	hint := dimStyle.Render(" (enter to apply hex, esc to cancel)")
+	hint := dimStyle.Render(" (tab to switch swatches, enter to apply hex, esc to cancel)")
 	body := swatches.String() + "\nhex: " + m.input.View() + hint
 	return modalStyle.Render(body)
 }

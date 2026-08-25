@@ -42,6 +42,18 @@ func (m Model) handleColorPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mode = modeNormal
 		m.input.Blur()
 		return m, nil
+	case "tab":
+		m.colorPickerFocus = (m.colorPickerFocus + 1) % len(Palette)
+		m.setColor(Palette[m.colorPickerFocus])
+		m.input.SetValue(Palette[m.colorPickerFocus])
+		m.input.CursorEnd()
+		return m, nil
+	case "shift+tab":
+		m.colorPickerFocus = (m.colorPickerFocus - 1 + len(Palette)) % len(Palette)
+		m.setColor(Palette[m.colorPickerFocus])
+		m.input.SetValue(Palette[m.colorPickerFocus])
+		m.input.CursorEnd()
+		return m, nil
 	}
 	var cmd tea.Cmd
 	m.input, cmd = m.input.Update(msg)

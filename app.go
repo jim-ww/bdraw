@@ -198,6 +198,10 @@ type Model struct {
 	snap     bool
 	showHelp bool
 
+	// colorPickerFocus is which palette swatch Tab/Shift+Tab currently has
+	// selected, for keyboard-only color switching; -1 = none focused yet.
+	colorPickerFocus int
+
 	// numberEntry is the shared click-to-type-a-number state, used by both
 	// the size and zoom controls (see numberentry.go).
 	numEntryTarget string
