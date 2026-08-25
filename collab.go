@@ -67,7 +67,6 @@ var peerColors = []string{
 type Hub struct {
 	mu       sync.Mutex
 	tabs     []*Document
-	active   int
 	readOnly bool
 	peers    map[int]*peer
 	nextID   int
@@ -83,24 +82,34 @@ type peer struct {
 // NewHub creates a Hub around the given tab list. readOnly, if true, means
 // every non-host peer may view and follow along — including switching
 // between tabs — but not edit or create/close tabs.
-func NewHub(tabs []*Document, active int, readOnly bool) *Hub {
-	return &Hub{tabs: tabs, active: active, readOnly: readOnly, peers: map[int]*peer{}}
+//
+// Which tab is active is deliberately NOT part of the Hub: it's each
+// peer's own Model.active, kept local like pan/zoom (see
+// Model.viewOffset/viewZoom in app.go) rather than synced. Tab switching
+// was shared at first, and it was a bad call — one peer clicking a
+// different tab yanked every other connected peer's view to that same
+// tab out from under them, mid-edit. The tab *list* (which documents
+// exist) is genuinely shared state; which one each viewer is looking at
+// right now is exploration, not document state, exactly like pan/zoom.
+func NewHub(tabs []*Document, readOnly bool) *Hub {
+	return &Hub{tabs: tabs, readOnly: readOnly, peers: map[int]*peer{}}
 }
 
-// snapshot returns a copy of the current tab list and active index, safe
-// to hand to a Model. Must be called with h.mu held or right after Join,
-// before any other peer's mutation can race it.
-func (h *Hub) snapshot() (tabs []*Document, active int) {
-	return h.tabs, h.active
+// snapshot returns the current shared tab list, safe to hand to a Model.
+// Must be called with h.mu held or right after Join, before any other
+// peer's mutation can race it.
+func (h *Hub) snapshot() []*Document {
+	return h.tabs
 }
 
-// docsSignature is a cheap fingerprint of every tab's identity and edit
-// version plus which one is active, used by collabWrap to decide whether
-// a peer's turn through Update actually changed shared state worth
-// broadcasting (a new/closed/switched tab, or an edit) versus something
-// purely local (cursor motion, a slider drag with no committed change).
-func docsSignature(tabs []*Document, active int) string {
-	sig := fmt.Sprintf("%d:", active)
+// docsSignature is a cheap fingerprint of every shared tab's identity and
+// edit version, used by collabWrap to decide whether a peer's turn
+// through Update actually changed shared state worth broadcasting (a
+// tab created/closed, or an edit) versus something purely local (cursor
+// motion, this peer's own tab switch, a slider drag with no committed
+// change).
+func docsSignature(tabs []*Document) string {
+	sig := ""
 	for _, d := range tabs {
 		sig += fmt.Sprintf("%p=%d,", d, d.Version)
 	}
@@ -180,12 +189,12 @@ func (m Model) collabWrap(fn func(Model) (tea.Model, tea.Cmd)) (tea.Model, tea.C
 		return fn(m)
 	}
 	m.hub.mu.Lock()
-	m.tabs, m.active = m.hub.snapshot()
-	before := docsSignature(m.tabs, m.active)
+	m.setTabs(m.hub.snapshot())
+	before := docsSignature(m.tabs)
 	newModel, cmd := fn(m)
 	nm := newModel.(Model)
-	nm.hub.tabs, nm.hub.active = nm.tabs, nm.active
-	after := docsSignature(nm.tabs, nm.active)
+	nm.hub.tabs = nm.tabs
+	after := docsSignature(nm.tabs)
 	m.hub.mu.Unlock()
 	if after != before {
 		m.hub.broadcastExcept(m.peerID, collabRefreshMsg{})
@@ -294,7 +303,7 @@ func serveCollabSession(sess ssh.Session, hub *Hub, cfg Config) {
 	m.cfg = cfg
 	applyPaletteOverride(cfg.Palette)
 	hub.mu.Lock()
-	m.tabs, m.active = hub.snapshot()
+	m.setTabs(hub.snapshot())
 	hub.mu.Unlock()
 	m.readOnly = hub.readOnly
 	m.width, m.height = pty.Window.Width, pty.Window.Height

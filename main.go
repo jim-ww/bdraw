@@ -65,7 +65,7 @@ func main() {
 	// visible to them once they generate their own event; before this,
 	// only the shared *Document's content propagated (via pointer
 	// aliasing), never the host's own tab-list changes.
-	hub := NewHub(m.tabs, m.active, *collabReadOnly)
+	hub := NewHub(m.tabs, *collabReadOnly)
 
 	go func() {
 		if err := runCollabServer(*collabAddr, hub, m.cfg); err != nil {

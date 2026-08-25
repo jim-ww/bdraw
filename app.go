@@ -420,6 +420,36 @@ func (m *Model) doc() *Document {
 	return m.tabs[m.active]
 }
 
+// setTabs replaces m.tabs with newTabs — the shared list pulled from the
+// Hub in a collab session — while keeping m.active pointing at the same
+// *Document by identity, not by index. Tab list mutations elsewhere
+// (another peer creating or closing a tab) can shift indices around; an
+// index-only resync would silently swap which document this peer is
+// looking at out from under them. Falls back to clamping into range,
+// same as solo doCloseTab, only if the previously-active document is no
+// longer present at all (it was closed).
+func (m *Model) setTabs(newTabs []*Document) {
+	var was *Document
+	if m.active >= 0 && m.active < len(m.tabs) {
+		was = m.tabs[m.active]
+	}
+	m.tabs = newTabs
+	if was != nil {
+		for i, d := range newTabs {
+			if d == was {
+				m.active = i
+				return
+			}
+		}
+	}
+	if m.active >= len(m.tabs) {
+		m.active = len(m.tabs) - 1
+	}
+	if m.active < 0 {
+		m.active = 0
+	}
+}
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -443,7 +473,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case collabRefreshMsg:
 		if m.hub != nil {
 			m.hub.mu.Lock()
-			m.tabs, m.active = m.hub.snapshot()
+			m.setTabs(m.hub.snapshot())
 			m.hub.mu.Unlock()
 		}
 		return m, nil
