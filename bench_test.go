@@ -51,7 +51,7 @@ func BenchmarkRasterizeDocument(b *testing.B) {
 // including the per-run lipgloss styling.
 func BenchmarkViewCanvas(b *testing.B) {
 	for _, n := range []int{10, 100, 1000} {
-		m := NewModel()
+		m := NewModel("")
 		m.width, m.height = 160, 48
 		m.doc().Edits = makeStrokes(n, 40)
 		b.Run(fmt.Sprintf("edits=%d", n), func(b *testing.B) {
@@ -71,7 +71,7 @@ func BenchmarkEraseAt(b *testing.B) {
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
 				b.StopTimer()
-				m := NewModel()
+				m := NewModel("")
 				m.doc().Edits = makeStrokes(n, 40)
 				m.erasedIDs = map[int]bool{}
 				b.StartTimer()
@@ -123,7 +123,7 @@ func BenchmarkDrawSegment(b *testing.B) {
 // change) reuses the same Raster instead of re-rasterizing, which is the
 // actual fix for the high-zoom cursor lag.
 func TestCanvasRasterCacheHit(t *testing.T) {
-	m := NewModel()
+	m := NewModel("")
 	m.width, m.height = 160, 48
 	m.doc().Edits = makeStrokes(200, 40)
 
@@ -146,7 +146,7 @@ func TestCanvasRasterCacheHit(t *testing.T) {
 // motion only), which should be tiny regardless of edit count or zoom,
 // unlike a full RasterizeDocument call.
 func BenchmarkCanvasRasterCached(b *testing.B) {
-	m := NewModel()
+	m := NewModel("")
 	m.width, m.height = 160, 48
 	m.doc().Edits = makeStrokes(1000, 40)
 	m.doc().Zoom = 8

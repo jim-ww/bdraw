@@ -250,8 +250,11 @@ type canvasCache struct {
 	dragPointsBaked int
 }
 
-func NewModel() Model {
-	cfg := LoadConfig()
+// NewModel builds the initial application state. configPath overrides
+// where the config file is loaded from (see the -c flag); pass "" to use
+// the default location.
+func NewModel(configPath string) Model {
+	cfg := LoadConfig(configPath)
 	applyPaletteOverride(cfg.Palette)
 	color := Palette[0]
 	if c, ok := normalizeHexColor(cfg.DefaultColor); ok {
