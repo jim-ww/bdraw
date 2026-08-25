@@ -30,6 +30,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.setTool(ToolFill)
 	case key.Matches(msg, m.km.ToolArrow):
 		m.setTool(ToolArrow)
+	case key.Matches(msg, m.km.ToolEyedropper):
+		m.setTool(ToolEyedropper)
 
 	case key.Matches(msg, m.km.Undo):
 		m.doUndo()
@@ -39,6 +41,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.doDeleteSelected()
 	case key.Matches(msg, m.km.ClearSelection):
 		m.clearSelection()
+	case key.Matches(msg, m.km.Copy):
+		m.doCopy()
+	case key.Matches(msg, m.km.Paste):
+		m.doPaste()
 
 	case key.Matches(msg, m.km.New):
 		m.doNew()
@@ -57,6 +63,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.openColorPicker()
 	case key.Matches(msg, m.km.ToggleGrid):
 		m.showGrid = !m.showGrid
+	case key.Matches(msg, m.km.ToggleSnap):
+		m.snap = !m.snap
 	case key.Matches(msg, m.km.ToggleFill):
 		m.filled = !m.filled
 	case key.Matches(msg, m.km.ToggleCompact):

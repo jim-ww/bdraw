@@ -1,6 +1,8 @@
 package main
 
 import (
+	"math"
+
 	tea "charm.land/bubbletea/v2"
 	zone "github.com/lrstanley/bubblezone/v2"
 )
@@ -89,6 +91,8 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	constrain := msg.Mouse().Mod&tea.ModShift != 0
+
 	switch e := msg.(type) {
 	case tea.MouseClickMsg:
 		if e.Mouse().Button == tea.MouseLeft {
@@ -96,11 +100,11 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 	case tea.MouseMotionMsg:
 		if m.dragging {
-			return m.toolDrag(pt)
+			return m.toolDrag(pt, constrain)
 		}
 	case tea.MouseReleaseMsg:
 		if m.dragging {
-			return m.toolUp(pt)
+			return m.toolUp(pt, constrain)
 		}
 	}
 	return m, nil
@@ -207,6 +211,7 @@ func (m *Model) toolDown(pt Point) (tea.Model, tea.Cmd) {
 		m.dragEdit, m.dragging = e, true
 
 	case ToolLine, ToolRect, ToolCircle, ToolArrow:
+		pt = m.snapPoint(pt)
 		d.BeginChange()
 		kind := map[Tool]Kind{ToolLine: KindLine, ToolRect: KindRect, ToolCircle: KindCircle, ToolArrow: KindArrow}[m.tool]
 		e := &Edit{ID: d.NextID(), Kind: kind, Points: []Point{pt, pt}, Color: m.color, Size: m.size, Filled: m.filled}
@@ -241,11 +246,17 @@ func (m *Model) toolDown(pt Point) (tea.Model, tea.Cmd) {
 		d.Edits = append(d.Edits, e)
 
 	case ToolText:
-		m.textPos = pt
+		m.textPos = m.snapPoint(pt)
 		m.mode = modeTextEntry
 		m.input.SetValue("")
 		m.input.Focus()
 		return *m, nil
+
+	case ToolEyedropper:
+		if e := m.nearestEdit(pt, selectTolerance); e != nil {
+			m.setColor(e.Color)
+			m.status = "picked " + e.Color
+		}
 	}
 	return *m, nil
 }
@@ -265,7 +276,29 @@ func (m *Model) toolDown(pt Point) (tea.Model, tea.Cmd) {
 // jumps instead of smoothly.
 const minDragScreenDist = 3
 
-func (m *Model) toolDrag(pt Point) (tea.Model, tea.Cmd) {
+// constrainPoint applies the shift-drag modifier: lines and arrows snap to
+// the nearest 45° angle from start, rectangles and ovals snap to an equal
+// width/height (square/circle) — the conventional meaning of shift-drag in
+// most paint tools.
+func constrainPoint(kind Kind, start, pt Point) Point {
+	dx, dy := pt.X-start.X, pt.Y-start.Y
+	switch kind {
+	case KindLine, KindArrow:
+		length := math.Hypot(dx, dy)
+		if length == 0 {
+			return pt
+		}
+		angle := math.Round(math.Atan2(dy, dx)/(math.Pi/4)) * (math.Pi / 4)
+		return Point{X: start.X + length*math.Cos(angle), Y: start.Y + length*math.Sin(angle)}
+	case KindRect, KindCircle:
+		side := math.Max(math.Abs(dx), math.Abs(dy))
+		return Point{X: start.X + math.Copysign(side, dx), Y: start.Y + math.Copysign(side, dy)}
+	default:
+		return pt
+	}
+}
+
+func (m *Model) toolDrag(pt Point, constrain bool) (tea.Model, tea.Cmd) {
 	switch m.tool {
 	case ToolBrush:
 		zoom := m.doc().Zoom
@@ -278,7 +311,10 @@ func (m *Model) toolDrag(pt Point) (tea.Model, tea.Cmd) {
 			m.doc().Touch()
 		}
 	case ToolLine, ToolRect, ToolCircle, ToolArrow:
-		m.dragEdit.Points[1] = pt
+		if constrain {
+			pt = constrainPoint(m.dragEdit.Kind, m.dragEdit.Points[0], pt)
+		}
+		m.dragEdit.Points[1] = m.snapPoint(pt)
 		m.doc().Touch()
 	case ToolEraser:
 		m.eraseAt(pt)
@@ -311,10 +347,13 @@ func (m *Model) toolDrag(pt Point) (tea.Model, tea.Cmd) {
 // marquee rectangle rather than a click.
 const selectDragThreshold = 10
 
-func (m *Model) toolUp(pt Point) (tea.Model, tea.Cmd) {
+func (m *Model) toolUp(pt Point, constrain bool) (tea.Model, tea.Cmd) {
 	switch m.tool {
 	case ToolLine, ToolRect, ToolCircle, ToolArrow:
-		m.dragEdit.Points[1] = pt
+		if constrain {
+			pt = constrainPoint(m.dragEdit.Kind, m.dragEdit.Points[0], pt)
+		}
+		m.dragEdit.Points[1] = m.snapPoint(pt)
 		m.doc().Touch()
 	case ToolEraser:
 		m.eraseAt(pt)

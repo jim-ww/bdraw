@@ -1,6 +1,8 @@
 package main
 
 import (
+	"math"
+
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 )
@@ -9,31 +11,33 @@ import (
 type Tool string
 
 const (
-	ToolBrush  Tool = "brush"
-	ToolRect   Tool = "rect"
-	ToolCircle Tool = "circle"
-	ToolLine   Tool = "line"
-	ToolEraser Tool = "eraser"
-	ToolSelect Tool = "select"
-	ToolText   Tool = "text"
-	ToolMove   Tool = "move"
-	ToolFill   Tool = "fill"
-	ToolArrow  Tool = "arrow"
+	ToolBrush      Tool = "brush"
+	ToolRect       Tool = "rect"
+	ToolCircle     Tool = "circle"
+	ToolLine       Tool = "line"
+	ToolEraser     Tool = "eraser"
+	ToolSelect     Tool = "select"
+	ToolText       Tool = "text"
+	ToolMove       Tool = "move"
+	ToolFill       Tool = "fill"
+	ToolArrow      Tool = "arrow"
+	ToolEyedropper Tool = "eyedropper"
 )
 
 // toolCursor is the glyph drawn at the mouse position for each tool, so the
 // cursor reflects what a click will do.
 var toolCursor = map[Tool]rune{
-	ToolBrush:  '●',
-	ToolRect:   '▭',
-	ToolCircle: '◯',
-	ToolLine:   '╱',
-	ToolEraser: '⌫',
-	ToolSelect: '↖',
-	ToolText:   'T',
-	ToolMove:   '✥',
-	ToolFill:   '▓',
-	ToolArrow:  '➔',
+	ToolBrush:      '●',
+	ToolRect:       '▭',
+	ToolCircle:     '◯',
+	ToolLine:       '╱',
+	ToolEraser:     '⌫',
+	ToolSelect:     '↖',
+	ToolText:       'T',
+	ToolMove:       '✥',
+	ToolFill:       '▓',
+	ToolArrow:      '➔',
+	ToolEyedropper: '⚲',
 }
 
 // drawTools are tools whose cursor should reflect the current draw color;
@@ -77,6 +81,24 @@ const (
 	zoomStep = 1.25
 	panStep  = 8 // world subpixels per arrow-key press
 )
+
+// snapStep is the fixed world-unit grid snap-to-grid rounds points to. Kept
+// separate from the visual dot grid's adaptive spacing (view.go) — that
+// one's tuned to always look reasonable on screen at any zoom, while this
+// one needs to stay put so the same click always snaps the same way.
+const snapStep = 16.0
+
+// snapPoint rounds p to the nearest snapStep grid intersection, when snap
+// is enabled; otherwise it's the identity.
+func (m Model) snapPoint(p Point) Point {
+	if !m.snap {
+		return p
+	}
+	return Point{
+		X: math.Round(p.X/snapStep) * snapStep,
+		Y: math.Round(p.Y/snapStep) * snapStep,
+	}
+}
 
 // mode is which modal input state the UI is in. Everything drawing-related
 // happens in modeNormal; the others take over input for one piece of text
@@ -122,6 +144,11 @@ type Model struct {
 	selectStart Point
 	selectLast  Point
 
+	// clipboard holds copied edits (deep clones, so later mutation of the
+	// originals can't corrupt a pending paste). In-app only — not the OS
+	// clipboard.
+	clipboard []*Edit
+
 	// middle-mouse-button pan drag
 	panning    bool
 	panLastCol int
@@ -143,6 +170,7 @@ type Model struct {
 	showGrid bool
 	filled   bool
 	compact  bool
+	snap     bool
 
 	// numberEntry is the shared click-to-type-a-number state, used by both
 	// the size and zoom controls (see numberentry.go).

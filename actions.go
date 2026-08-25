@@ -143,6 +143,54 @@ func (m *Model) closeTab(i int) {
 	}
 }
 
+// pasteOffset nudges a paste from its source position (world subpixels),
+// so pasting repeatedly builds a visible staircase instead of every copy
+// landing exactly on top of the last.
+const pasteOffset = 12
+
+// doCopy snapshots every currently selected edit into the in-app
+// clipboard. No-op if nothing is selected — a copy shouldn't silently
+// clear a previous, still-useful clipboard.
+func (m *Model) doCopy() {
+	var copied []*Edit
+	for _, e := range m.doc().Edits {
+		if e.Selected {
+			copied = append(copied, e.Clone())
+		}
+	}
+	if len(copied) == 0 {
+		return
+	}
+	m.clipboard = copied
+	m.status = fmt.Sprintf("copied %d edit(s)", len(copied))
+}
+
+// doPaste inserts fresh copies of the clipboard, offset slightly, selected
+// and ready to move — mirrors doCopy in ignoring an empty clipboard rather
+// than starting an undo point for nothing.
+func (m *Model) doPaste() {
+	if len(m.clipboard) == 0 {
+		return
+	}
+	d := m.doc()
+	d.BeginChange()
+	for _, e := range d.Edits {
+		e.Selected = false
+	}
+	for _, src := range m.clipboard {
+		e := src.Clone()
+		e.ID = d.NextID()
+		e.Selected = true
+		for i := range e.Points {
+			e.Points[i].X += pasteOffset
+			e.Points[i].Y += pasteOffset
+		}
+		d.Edits = append(d.Edits, e)
+	}
+	m.tool = ToolMove
+	m.status = fmt.Sprintf("pasted %d edit(s)", len(m.clipboard))
+}
+
 // doDeleteSelected removes every edit currently marked Selected (select
 // tool). No-op, and no undo point, if nothing is selected.
 func (m *Model) doDeleteSelected() {

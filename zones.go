@@ -52,22 +52,24 @@ const (
 	zoneUndo   = "undo"
 	zoneRedo   = "redo"
 
-	zoneToolBrush  = "tool-brush"
-	zoneToolRect   = "tool-rect"
-	zoneToolCircle = "tool-circle"
-	zoneToolLine   = "tool-line"
-	zoneToolEraser = "tool-eraser"
-	zoneToolSelect = "tool-select"
-	zoneToolText   = "tool-text"
-	zoneToolMove   = "tool-move"
-	zoneToolFill   = "tool-fill"
-	zoneToolArrow  = "tool-arrow"
+	zoneToolBrush      = "tool-brush"
+	zoneToolRect       = "tool-rect"
+	zoneToolCircle     = "tool-circle"
+	zoneToolLine       = "tool-line"
+	zoneToolEraser     = "tool-eraser"
+	zoneToolSelect     = "tool-select"
+	zoneToolText       = "tool-text"
+	zoneToolMove       = "tool-move"
+	zoneToolFill       = "tool-fill"
+	zoneToolArrow      = "tool-arrow"
+	zoneToolEyedropper = "tool-eyedropper"
 
 	zoneSizeInc   = "size-inc"
 	zoneSizeDec   = "size-dec"
 	zoneSizeValue = "size-value"
 	zoneZoomValue = "zoom-value"
 	zoneGrid      = "grid"
+	zoneSnap      = "snap"
 	zoneFilled    = "filled"
 
 	zoneColorButton = "color-button"
@@ -90,9 +92,9 @@ func (m Model) zoneIDs() []string {
 	ids := []string{
 		zoneNew, zoneOpen, zoneSave, zoneSaveAs, zoneExport, zoneClear, zoneUndo, zoneRedo,
 		zoneToolBrush, zoneToolRect, zoneToolCircle, zoneToolLine,
-		zoneToolEraser, zoneToolSelect, zoneToolText, zoneToolMove, zoneToolFill, zoneToolArrow,
+		zoneToolEraser, zoneToolSelect, zoneToolText, zoneToolMove, zoneToolFill, zoneToolArrow, zoneToolEyedropper,
 		zoneSizeInc, zoneSizeDec, zoneSizeValue, zoneColorButton, zoneZoomIn, zoneZoomOut, zoneZoomValue,
-		zoneGrid, zoneFilled, zoneNewTab, zoneCompact,
+		zoneGrid, zoneSnap, zoneFilled, zoneNewTab, zoneCompact,
 	}
 	if m.mode == modeColorPicker {
 		for i := range Palette {
@@ -166,6 +168,8 @@ func (m Model) handleZoneClick(id string) (tea.Model, tea.Cmd) {
 		m.setTool(ToolFill)
 	case zoneToolArrow:
 		m.setTool(ToolArrow)
+	case zoneToolEyedropper:
+		m.setTool(ToolEyedropper)
 
 	case zoneSizeInc:
 		m.sizeInc()
@@ -183,6 +187,8 @@ func (m Model) handleZoneClick(id string) (tea.Model, tea.Cmd) {
 		m.startNumberEntry("zoom", m.doc().Zoom*100)
 	case zoneGrid:
 		m.showGrid = !m.showGrid
+	case zoneSnap:
+		m.snap = !m.snap
 	case zoneFilled:
 		m.filled = !m.filled
 	case zoneCompact:

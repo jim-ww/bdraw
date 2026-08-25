@@ -188,6 +188,7 @@ func (m Model) toolbarLines() []string {
 		m.toolButton(zoneToolMove, ToolMove, m.tool == ToolMove),
 		m.toolButton(zoneToolFill, ToolFill, m.tool == ToolFill),
 		m.toolButton(zoneToolArrow, ToolArrow, m.tool == ToolArrow),
+		m.toolButton(zoneToolEyedropper, ToolEyedropper, m.tool == ToolEyedropper),
 		m.toolButton(zoneToolText, ToolText, m.tool == ToolText),
 		m.button(zoneFilled, "Filled: "+onOff(m.filled), m.filled),
 		m.colorButton(),
@@ -198,6 +199,7 @@ func (m Model) toolbarLines() []string {
 		m.button(zoneZoomValue, "zoom "+m.numberEntryLabel("zoom", "%", m.doc().Zoom*100), m.mode == modeNumberEntry && m.numEntryTarget == "zoom"),
 		m.button(zoneZoomIn, "+", false),
 		m.button(zoneGrid, "Grid: "+onOff(m.showGrid), m.showGrid),
+		m.button(zoneSnap, "Snap: "+onOff(m.snap), m.snap),
 	}
 	return wrapButtons(buttons, m.width)
 }
