@@ -145,6 +145,13 @@ func (m *Model) handleWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 			m.zoomAtCursor(1 / zoomStep)
 		}
 		return *m, nil
+	case zoneHardnessValue:
+		if up {
+			m.hardnessInc()
+		} else {
+			m.hardnessDec()
+		}
+		return *m, nil
 	}
 
 	factor := zoomStep
@@ -222,7 +229,7 @@ func (m *Model) toolDown(pt Point) (tea.Model, tea.Cmd) {
 	switch m.tool {
 	case ToolBrush:
 		d.BeginChange()
-		e := &Edit{ID: d.NextID(), Kind: KindStroke, Points: []Point{pt}, Color: m.color, Size: m.size}
+		e := &Edit{ID: d.NextID(), Kind: KindStroke, Points: []Point{pt}, Color: m.color, Size: m.size, Hardness: m.hardness}
 		d.Edits = append(d.Edits, e)
 		m.dragEdit, m.dragging = e, true
 
@@ -230,7 +237,7 @@ func (m *Model) toolDown(pt Point) (tea.Model, tea.Cmd) {
 		pt = m.snapPoint(pt)
 		d.BeginChange()
 		kind := map[Tool]Kind{ToolLine: KindLine, ToolRect: KindRect, ToolCircle: KindCircle, ToolArrow: KindArrow}[m.tool]
-		e := &Edit{ID: d.NextID(), Kind: kind, Points: []Point{pt, pt}, Color: m.color, Size: m.size, Filled: m.filled}
+		e := &Edit{ID: d.NextID(), Kind: kind, Points: []Point{pt, pt}, Color: m.color, Size: m.size, Filled: m.filled, Hardness: m.hardness}
 		d.Edits = append(d.Edits, e)
 		m.dragEdit, m.dragging = e, true
 

@@ -73,6 +73,8 @@ func (m Model) helpSections() []helpSection {
 			he(km.ZoomOut, "zoom out"),
 			he(km.SizeInc, "size up"),
 			he(km.SizeDec, "size down"),
+			he(km.HardnessInc, "hardness up"),
+			he(km.HardnessDec, "hardness down"),
 		}},
 		{"Tabs", []helpEntry{
 			he(km.NewTab, "new tab"),

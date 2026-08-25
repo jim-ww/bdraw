@@ -112,6 +112,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.sizeInc()
 	case key.Matches(msg, m.km.SizeDec):
 		m.sizeDec()
+	case key.Matches(msg, m.km.HardnessInc):
+		m.hardnessInc()
+	case key.Matches(msg, m.km.HardnessDec):
+		m.hardnessDec()
 
 	case key.Matches(msg, m.km.PanUp):
 		m.panBy(0, -panStep)

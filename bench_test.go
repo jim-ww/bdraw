@@ -108,7 +108,7 @@ func BenchmarkDrawSegment(b *testing.B) {
 	r := &Raster{Cols: 160, Rows: 45, cells: make([]cell, 160*45)}
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		r.drawSegment(0, 0, 300, 150, 1, "#ffffff")
+		r.drawSegment(0, 0, 300, 150, 1, 100, "#ffffff")
 	}
 }
 

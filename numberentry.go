@@ -29,6 +29,8 @@ func (m Model) numberEntryRange() (lo, hi float64, label string, ok bool) {
 		return sizeMin, sizeMax, "size", true
 	case "zoom":
 		return zoomMin * 100, zoomMax * 100, "zoom", true
+	case "hardness":
+		return hardnessMin, hardnessMax, "hardness", true
 	default:
 		return 0, 0, "", false
 	}
@@ -46,6 +48,9 @@ func (m *Model) applyNumberEntryValue(v float64) {
 	case "zoom":
 		m.zoomAtCursor(v / 100 / m.viewZoom())
 		applied = m.viewZoom() * 100
+	case "hardness":
+		m.setHardness(v)
+		applied = m.hardness
 	}
 	// Reflect what actually got applied (setSize/zoomAtCursor round and
 	// clamp), not the raw slider/arrow-key math — and format to a fixed 1
@@ -69,6 +74,8 @@ func (m Model) handleNumberEntryKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.setSize(v)
 			case "zoom":
 				m.zoomAtCursor(v / 100 / m.viewZoom())
+			case "hardness":
+				m.setHardness(v)
 			}
 		} else {
 			m.status = "invalid number"

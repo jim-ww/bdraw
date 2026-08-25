@@ -39,6 +39,28 @@ func (m *Model) setSize(s float64) {
 	m.size = math.Round(s*10) / 10
 }
 
+// hardnessInc/hardnessDec step brush hardness by a fixed amount, additive
+// rather than multiplicative like size/zoom — the whole range
+// (hardnessMin..100) spans less than one decade, so a multiplicative
+// step would feel uneven across it.
+func (m *Model) hardnessInc() {
+	m.setHardness(m.hardness + hardnessStep)
+}
+
+func (m *Model) hardnessDec() {
+	m.setHardness(m.hardness - hardnessStep)
+}
+
+func (m *Model) setHardness(h float64) {
+	if h < hardnessMin {
+		h = hardnessMin
+	}
+	if h > hardnessMax {
+		h = hardnessMax
+	}
+	m.hardness = math.Round(h)
+}
+
 func (m *Model) openColorPicker() {
 	m.mode = modeColorPicker
 	m.colorPickerFocus = -1

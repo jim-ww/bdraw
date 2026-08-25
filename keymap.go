@@ -51,6 +51,9 @@ type KeyMap struct {
 	SizeInc key.Binding
 	SizeDec key.Binding
 
+	HardnessInc key.Binding
+	HardnessDec key.Binding
+
 	PanUp    key.Binding
 	PanDown  key.Binding
 	PanLeft  key.Binding
@@ -125,6 +128,10 @@ func DefaultKeyMap() KeyMap {
 
 		SizeInc: bind([]string{"+", "="}, "size up"),
 		SizeDec: bind([]string{"-"}, "size down"),
+
+		// Right next to zoom's [/], one shift-level up on the same keys.
+		HardnessInc: bind([]string{"}"}, "hardness up"),
+		HardnessDec: bind([]string{"{"}, "hardness down"),
 
 		PanUp:    bind([]string{"up"}, "pan up"),
 		PanDown:  bind([]string{"down"}, "pan down"),
@@ -218,6 +225,8 @@ func applyOverrides(km *KeyMap, overrides keyOverrides) {
 		"new_tab":          &km.NewTab,
 		"size_inc":         &km.SizeInc,
 		"size_dec":         &km.SizeDec,
+		"hardness_inc":     &km.HardnessInc,
+		"hardness_dec":     &km.HardnessDec,
 		"pan_up":           &km.PanUp,
 		"pan_down":         &km.PanDown,
 		"pan_left":         &km.PanLeft,

@@ -104,6 +104,12 @@ const (
 	panStep  = 8 // world subpixels per arrow-key press
 )
 
+const (
+	hardnessMin  = 10.0
+	hardnessMax  = 100.0
+	hardnessStep = 10.0 // additive: the range is under one decade, unlike size/zoom
+)
+
 // snapStep is the fixed world-unit grid snap-to-grid rounds points to. Kept
 // separate from the visual dot grid's adaptive spacing (view.go) — that
 // one's tuned to always look reasonable on screen at any zoom, while this
@@ -146,9 +152,10 @@ type Model struct {
 	tabs   []*Document
 	active int
 
-	tool  Tool
-	color string
-	size  float64
+	tool     Tool
+	color    string
+	size     float64
+	hardness float64 // percentage, hardnessMin..100 — see Edit.Hardness
 
 	width, height int
 
@@ -396,6 +403,7 @@ func NewModel(configPath string) Model {
 		tool:     ToolBrush,
 		color:    color,
 		size:     1,
+		hardness: hardnessMax,
 		input:    ti,
 		cache:    &canvasCache{},
 		zm:       zone.New(),

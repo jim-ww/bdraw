@@ -60,13 +60,16 @@ const (
 	zoneToolArrow      = "tool-arrow"
 	zoneToolEyedropper = "tool-eyedropper"
 
-	zoneSizeInc   = "size-inc"
-	zoneSizeDec   = "size-dec"
-	zoneSizeValue = "size-value"
-	zoneZoomValue = "zoom-value"
-	zoneGrid      = "grid"
-	zoneSnap      = "snap"
-	zoneFilled    = "filled"
+	zoneSizeInc       = "size-inc"
+	zoneSizeDec       = "size-dec"
+	zoneSizeValue     = "size-value"
+	zoneZoomValue     = "zoom-value"
+	zoneHardnessInc   = "hardness-inc"
+	zoneHardnessDec   = "hardness-dec"
+	zoneHardnessValue = "hardness-value"
+	zoneGrid          = "grid"
+	zoneSnap          = "snap"
+	zoneFilled        = "filled"
 
 	zoneColorButton = "color-button"
 	zoneZoomIn      = "zoom-in"
@@ -90,6 +93,7 @@ func (m Model) zoneIDs() []string {
 		zoneToolBrush, zoneToolRect, zoneToolCircle, zoneToolLine,
 		zoneToolEraser, zoneToolSelect, zoneToolText, zoneToolMove, zoneToolFill, zoneToolArrow, zoneToolEyedropper,
 		zoneSizeInc, zoneSizeDec, zoneSizeValue, zoneColorButton, zoneZoomIn, zoneZoomOut, zoneZoomValue,
+		zoneHardnessInc, zoneHardnessDec, zoneHardnessValue,
 		zoneGrid, zoneSnap, zoneFilled, zoneNewTab, zoneCompact,
 	}
 	if m.mode == modeColorPicker {
@@ -111,7 +115,7 @@ func (m Model) zoneIDs() []string {
 }
 
 func (m Model) handleZoneClick(id string) (tea.Model, tea.Cmd) {
-	if m.mode == modeNumberEntry && id != zoneSizeValue && id != zoneZoomValue {
+	if m.mode == modeNumberEntry && id != zoneSizeValue && id != zoneZoomValue && id != zoneHardnessValue {
 		m.mode = modeNormal
 	}
 
@@ -198,6 +202,12 @@ func (m Model) handleZoneClick(id string) (tea.Model, tea.Cmd) {
 		m.sizeDec()
 	case zoneSizeValue:
 		m.startNumberEntry("size", m.size)
+	case zoneHardnessInc:
+		m.hardnessInc()
+	case zoneHardnessDec:
+		m.hardnessDec()
+	case zoneHardnessValue:
+		m.startNumberEntry("hardness", m.hardness)
 	case zoneColorButton:
 		m.openColorPicker()
 	case zoneZoomIn:

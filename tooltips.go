@@ -31,6 +31,8 @@ func (m Model) bindingTooltips() map[string]key.Binding {
 		zoneColorButton: km.ColorPicker,
 		zoneSizeInc:     km.SizeInc,
 		zoneSizeDec:     km.SizeDec,
+		zoneHardnessInc: km.HardnessInc,
+		zoneHardnessDec: km.HardnessDec,
 		zoneZoomIn:      km.ZoomIn,
 		zoneZoomOut:     km.ZoomOut,
 		zoneGrid:        km.ToggleGrid,
@@ -42,8 +44,9 @@ func (m Model) bindingTooltips() map[string]key.Binding {
 
 // literalTooltips covers zones with no single KeyMap binding behind them.
 var literalTooltips = map[string]string{
-	zoneSizeValue: "click to type a size",
-	zoneZoomValue: "click to type a zoom level",
+	zoneSizeValue:     "click to type a size",
+	zoneZoomValue:     "click to type a zoom level",
+	zoneHardnessValue: "click to type a hardness — lower feathers the brush edge",
 }
 
 // tooltip returns the hover hint for a zone ID, or "" if it has none (e.g.

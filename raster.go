@@ -242,23 +242,24 @@ func (r *Raster) drawEdit(e *Edit, ox, oy, zoom float64, color string) {
 		pts[i] = Point{X: (p.X - ox) * zoom, Y: (p.Y - oy) * zoom}
 	}
 	size := screenSize(e.Size, zoom)
+	hardness := e.hardness()
 
 	switch e.Kind {
 	case KindStroke, KindLine:
-		r.drawPolyline(pts, size, color)
+		r.drawPolyline(pts, size, hardness, color)
 	case KindArrow:
-		r.drawArrow(pts, size, color)
+		r.drawArrow(pts, size, hardness, color)
 	case KindRect:
 		if e.Filled {
 			r.fillRect(pts, color)
 		} else {
-			r.drawRect(pts, size, color)
+			r.drawRect(pts, size, hardness, color)
 		}
 	case KindCircle:
 		if e.Filled {
 			r.fillEllipse(pts, color)
 		} else {
-			r.drawEllipse(pts, size, color)
+			r.drawEllipse(pts, size, hardness, color)
 		}
 	case KindText:
 		r.drawText(pts, e.Text, color)
@@ -270,14 +271,14 @@ func (r *Raster) drawEdit(e *Edit, ox, oy, zoom float64, color string) {
 // already-drawn portion is included) directly onto this raster. It mirrors
 // drawEdit's transform and clamp exactly, so incrementally appending is
 // pixel-identical to a full rebuild — see canvasRaster in view.go.
-func (r *Raster) appendStroke(pts []Point, from int, size, ox, oy, zoom float64, color string) {
+func (r *Raster) appendStroke(pts []Point, from int, size, hardness, ox, oy, zoom float64, color string) {
 	s := screenSize(size, zoom)
 	transform := func(p Point) (float64, float64) {
 		return (p.X - ox) * zoom, (p.Y - oy) * zoom
 	}
 	if len(pts) == 1 {
 		x, y := transform(pts[0])
-		r.plotThick(x, y, s, color)
+		r.plotThick(x, y, s, hardness, color)
 		return
 	}
 	start := from - 1
@@ -287,7 +288,7 @@ func (r *Raster) appendStroke(pts []Point, from int, size, ox, oy, zoom float64,
 	for i := start; i+1 < len(pts); i++ {
 		x0, y0 := transform(pts[i])
 		x1, y1 := transform(pts[i+1])
-		r.drawSegment(x0, y0, x1, y1, s, color)
+		r.drawSegment(x0, y0, x1, y1, s, hardness, color)
 	}
 }
 
@@ -349,13 +350,13 @@ func (r *Raster) fillCellRange(x0, y0, x1, y1 float64, color string, inside func
 	}
 }
 
-func (r *Raster) drawPolyline(pts []Point, size float64, color string) {
+func (r *Raster) drawPolyline(pts []Point, size, hardness float64, color string) {
 	if len(pts) == 1 {
-		r.plotThick(pts[0].X, pts[0].Y, size, color)
+		r.plotThick(pts[0].X, pts[0].Y, size, hardness, color)
 		return
 	}
 	for i := 0; i+1 < len(pts); i++ {
-		r.drawSegment(pts[i].X, pts[i].Y, pts[i+1].X, pts[i+1].Y, size, color)
+		r.drawSegment(pts[i].X, pts[i].Y, pts[i+1].X, pts[i+1].Y, size, hardness, color)
 	}
 }
 
@@ -366,12 +367,12 @@ func (r *Raster) drawPolyline(pts []Point, size float64, color string) {
 const arrowHeadAngle = 0.5 // radians, ~29°
 const arrowHeadFrac = 0.3
 
-func (r *Raster) drawArrow(pts []Point, size float64, color string) {
+func (r *Raster) drawArrow(pts []Point, size, hardness float64, color string) {
 	if len(pts) < 2 {
 		return
 	}
 	from, to := pts[0], pts[1]
-	r.drawSegment(from.X, from.Y, to.X, to.Y, size, color)
+	r.drawSegment(from.X, from.Y, to.X, to.Y, size, hardness, color)
 
 	dx, dy := to.X-from.X, to.Y-from.Y
 	shaftLen := math.Hypot(dx, dy)
@@ -391,11 +392,11 @@ func (r *Raster) drawArrow(pts []Point, size float64, color string) {
 		a := angle + math.Pi - sign*arrowHeadAngle
 		bx := to.X + headLen*math.Cos(a)
 		by := to.Y + headLen*math.Sin(a)
-		r.drawSegment(to.X, to.Y, bx, by, size, color)
+		r.drawSegment(to.X, to.Y, bx, by, size, hardness, color)
 	}
 }
 
-func (r *Raster) drawRect(pts []Point, size float64, color string) {
+func (r *Raster) drawRect(pts []Point, size, hardness float64, color string) {
 	if len(pts) < 2 {
 		return
 	}
@@ -404,13 +405,13 @@ func (r *Raster) drawRect(pts []Point, size float64, color string) {
 	corners := [][2]float64{{x0, y0}, {x1, y0}, {x1, y1}, {x0, y1}}
 	for i := 0; i < 4; i++ {
 		a, b := corners[i], corners[(i+1)%4]
-		r.drawSegment(a[0], a[1], b[0], b[1], size, color)
+		r.drawSegment(a[0], a[1], b[0], b[1], size, hardness, color)
 	}
 }
 
 // drawEllipse draws the ellipse inscribed in the bounding box pts[0],pts[1],
 // so dragging opposite corners freely stretches it into an oval.
-func (r *Raster) drawEllipse(pts []Point, size float64, color string) {
+func (r *Raster) drawEllipse(pts []Point, size, hardness float64, color string) {
 	if len(pts) < 2 {
 		return
 	}
@@ -426,7 +427,7 @@ func (r *Raster) drawEllipse(pts []Point, size float64, color string) {
 	for i := 1; i <= steps; i++ {
 		t := 2 * math.Pi * float64(i) / float64(steps)
 		x, y := cx+rx*math.Cos(t), cy+ry*math.Sin(t)
-		r.drawSegment(prevX, prevY, x, y, size, color)
+		r.drawSegment(prevX, prevY, x, y, size, hardness, color)
 		prevX, prevY = x, y
 	}
 }
@@ -463,7 +464,7 @@ func (r *Raster) drawText(pts []Point, text string, color string) {
 // part of a big shape — makes steps enormous even though almost none of
 // it is ever visible, which was the real source of both the zoomed-in
 // slowdown and edges rendering while a huge fill's outline never finished.
-func (r *Raster) drawSegment(x0, y0, x1, y1, size float64, color string) {
+func (r *Raster) drawSegment(x0, y0, x1, y1, size, hardness float64, color string) {
 	pad := size + 2
 	maxX, maxY := float64(r.Cols*SubpixW), float64(r.Rows*SubpixH)
 	cx0, cy0, cx1, cy1, visible := clipSegment(x0, y0, x1, y1, -pad, -pad, maxX+pad, maxY+pad)
@@ -472,7 +473,7 @@ func (r *Raster) drawSegment(x0, y0, x1, y1, size float64, color string) {
 	}
 	length := math.Hypot(cx1-cx0, cy1-cy0)
 	if length == 0 {
-		r.plotThick(cx0, cy0, size, color)
+		r.plotThick(cx0, cy0, size, hardness, color)
 		return
 	}
 	// Splat spacing scales with the brush radius, not fixed per-subpixel:
@@ -489,7 +490,7 @@ func (r *Raster) drawSegment(x0, y0, x1, y1, size float64, color string) {
 	}
 	for i := 0; i <= steps; i++ {
 		t := float64(i) / float64(steps)
-		r.plotThick(cx0+(cx1-cx0)*t, cy0+(cy1-cy0)*t, size, color)
+		r.plotThick(cx0+(cx1-cx0)*t, cy0+(cy1-cy0)*t, size, hardness, color)
 	}
 }
 
@@ -532,12 +533,31 @@ func clipSegment(x0, y0, x1, y1, minX, minY, maxX, maxY float64) (cx0, cy0, cx1,
 	return x0 + tMin*dx, y0 + tMin*dy, x0 + tMax*dx, y0 + tMax*dy, true
 }
 
-// plotThick lights subpixels within radius size/2 of (x, y).
-func (r *Raster) plotThick(x, y, size float64, color string) {
+// hardnessGlyphs shades a soft brush's outer band from just-past-the-core
+// (index 0, densest) out to the brush's radius (last index, sparsest
+// before nothing) — the closest a terminal cell can get to alpha falloff
+// without real transparency.
+var hardnessGlyphs = []rune{'█', '▓', '▒', '░'}
+
+// plotThick lights subpixels within radius size/2 of (x, y). At full
+// hardness (100) this is exactly the original crisp braille-dot disc,
+// pixel-for-pixel — anything softer switches to plotThickSoft, which
+// operates at whole-cell granularity instead, since a cell can only show
+// one glyph and braille's per-subpixel dots have no notion of "half
+// covered".
+func (r *Raster) plotThick(x, y, size, hardness float64, color string) {
 	radius := size / 2
 	if radius < 0.5 {
 		radius = 0.5
 	}
+	if hardness >= 100 {
+		r.plotThickHard(x, y, radius, color)
+		return
+	}
+	r.plotThickSoft(x, y, radius, hardness, color)
+}
+
+func (r *Raster) plotThickHard(x, y, radius float64, color string) {
 	ix, iy := int(math.Round(x)), int(math.Round(y))
 	ri := int(math.Ceil(radius))
 	for dy := -ri; dy <= ri; dy++ {
@@ -546,6 +566,54 @@ func (r *Raster) plotThick(x, y, size float64, color string) {
 				continue
 			}
 			r.plot(ix+dx, iy+dy, color)
+		}
+	}
+}
+
+// plotThickSoft renders a disc of the given hardness (0..100, exclusive
+// of 100 — see plotThick) by walking whole terminal cells rather than
+// subpixels: every cell within coreRadius (radius scaled by hardness)
+// gets a solid block, and every cell beyond that out to radius gets one
+// of hardnessGlyphs based on how far past the core it falls, fading out
+// entirely past radius.
+func (r *Raster) plotThickSoft(x, y, radius, hardness float64, color string) {
+	coreRadius := radius * hardness / 100
+	band := radius - coreRadius
+
+	ccol, crow := int(math.Round(x/SubpixW)), int(math.Round(y/SubpixH))
+	rc := int(math.Ceil(radius/SubpixW)) + 1
+	rr := int(math.Ceil(radius/SubpixH)) + 1
+	for dr := -rr; dr <= rr; dr++ {
+		for dc := -rc; dc <= rc; dc++ {
+			col, row := ccol+dc, crow+dr
+			if col < 0 || row < 0 || col >= r.Cols || row >= r.Rows {
+				continue
+			}
+			cx := float64(col)*SubpixW + SubpixW/2
+			cy := float64(row)*SubpixH + SubpixH/2
+			d := math.Hypot(cx-x, cy-y)
+			if d > radius {
+				continue
+			}
+			cell := r.at(col, row)
+			// A soft splat supersedes any braille dots this cell had —
+			// mixing subpixel dots and a cell-wide glyph in the same
+			// cell isn't representable, so the glyph wins.
+			cell.dots = 0
+			cell.color = color
+			if d <= coreRadius {
+				cell.glyph = '█'
+				continue
+			}
+			t := 1.0
+			if band > 0 {
+				t = (d - coreRadius) / band
+			}
+			idx := int(t * float64(len(hardnessGlyphs)))
+			if idx >= len(hardnessGlyphs) {
+				idx = len(hardnessGlyphs) - 1
+			}
+			cell.glyph = hardnessGlyphs[idx]
 		}
 	}
 }

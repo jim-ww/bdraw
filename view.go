@@ -178,6 +178,7 @@ func (m Model) compactToolbarLine() []string {
 		inactiveStyle.Render(toolLabel),
 		m.button(zoneFilled, "Filled: "+onOff(m.filled), m.filled),
 		m.button(zoneSizeValue, "size "+m.numberEntryLabel("size", "", m.size), m.mode == modeNumberEntry && m.numEntryTarget == "size"),
+		m.button(zoneHardnessValue, "hard "+m.numberEntryLabel("hardness", "%", m.hardness), m.mode == modeNumberEntry && m.numEntryTarget == "hardness"),
 		m.button(zoneZoomValue, "zoom "+m.numberEntryLabel("zoom", "%", m.viewZoom()*100), m.mode == modeNumberEntry && m.numEntryTarget == "zoom"),
 	}
 	return wrapButtons(buttons, m.width)
@@ -213,6 +214,9 @@ func (m Model) toolbarLines() []string {
 		m.button(zoneSizeDec, "-", false),
 		m.button(zoneSizeValue, "size "+m.numberEntryLabel("size", "", m.size), m.mode == modeNumberEntry && m.numEntryTarget == "size"),
 		m.button(zoneSizeInc, "+", false),
+		m.button(zoneHardnessDec, "-", false),
+		m.button(zoneHardnessValue, "hard "+m.numberEntryLabel("hardness", "%", m.hardness), m.mode == modeNumberEntry && m.numEntryTarget == "hardness"),
+		m.button(zoneHardnessInc, "+", false),
 		m.button(zoneZoomOut, "-", false),
 		m.button(zoneZoomValue, "zoom "+m.numberEntryLabel("zoom", "%", m.viewZoom()*100), m.mode == modeNumberEntry && m.numEntryTarget == "zoom"),
 		m.button(zoneZoomIn, "+", false),
@@ -273,7 +277,7 @@ func (m Model) canvasRaster(cols, rows int, d *Document, offset Point, zoom floa
 		c.dragEditID == m.dragEdit.ID {
 		newPoints := len(m.dragEdit.Points) - c.dragPointsBaked
 		if newPoints > 0 && d.Version == c.docVer+newPoints {
-			c.raster.appendStroke(m.dragEdit.Points, c.dragPointsBaked, m.dragEdit.Size, offset.X, offset.Y, zoom, m.dragEdit.Color)
+			c.raster.appendStroke(m.dragEdit.Points, c.dragPointsBaked, m.dragEdit.Size, m.dragEdit.hardness(), offset.X, offset.Y, zoom, m.dragEdit.Color)
 			c.docVer = d.Version
 			c.dragPointsBaked = len(m.dragEdit.Points)
 			return c.raster
