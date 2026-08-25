@@ -416,10 +416,22 @@ func (r *Raster) drawSegment(x0, y0, x1, y1, size float64, color string) {
 	if !visible {
 		return
 	}
-	steps := int(math.Max(math.Abs(cx1-cx0), math.Abs(cy1-cy0)))
-	if steps == 0 {
+	length := math.Hypot(cx1-cx0, cy1-cy0)
+	if length == 0 {
 		r.plotThick(cx0, cy0, size, color)
 		return
+	}
+	// Splat spacing scales with the brush radius, not fixed per-subpixel:
+	// discs spaced up to a radius apart still fully tile the capsule with
+	// no gaps, so stepping every single subpixel — the old behavior — was
+	// redrawing nearly the same disc dozens of times over for a thick
+	// brush. That's what made "thick brush + high zoom" (radius scales
+	// with zoom) so slow: cost was O(length * radius^2) per segment
+	// instead of the O(length * radius) this achieves.
+	spacing := math.Max(size/2, 1) // never coarser than 1 subpixel, so thin strokes are unaffected
+	steps := int(length / spacing)
+	if steps < 1 {
+		steps = 1
 	}
 	for i := 0; i <= steps; i++ {
 		t := float64(i) / float64(steps)
