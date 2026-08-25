@@ -476,14 +476,22 @@ func (r *Raster) drawSegment(x0, y0, x1, y1, size, hardness float64, color strin
 		r.plotThick(cx0, cy0, size, hardness, color)
 		return
 	}
-	// Splat spacing scales with the brush radius, not fixed per-subpixel:
-	// discs spaced up to a radius apart still fully tile the capsule with
-	// no gaps, so stepping every single subpixel — the old behavior — was
+	// Splat spacing scales with the brush's *solid core* radius, not its
+	// full radius: discs spaced up to a radius apart fully tile a hard
+	// disc's capsule with no gaps (stepping every single subpixel was
 	// redrawing nearly the same disc dozens of times over for a thick
-	// brush. That's what made "thick brush + high zoom" (radius scales
-	// with zoom) so slow: cost was O(length * radius^2) per segment
-	// instead of the O(length * radius) this achieves.
-	spacing := math.Max(size/2, 1) // never coarser than 1 subpixel, so thin strokes are unaffected
+	// brush — that's what made "thick brush + high zoom" so slow, cost
+	// O(length * radius^2) instead of the O(length * radius) this
+	// achieves), but a soft brush's actually-solid core is only
+	// radius*hardness/100 wide. Spacing stamps by the full radius still
+	// left gaps between each stamp's small core, so a point between two
+	// stamp centers could fall in *both* neighbors' sparse outer bands
+	// at once — alternating which one "won" along the path produced a
+	// visible ░▒░▒ checkerboard the whole length of any dragged soft
+	// stroke, rather than one continuous feathered edge. At hardness 100
+	// coreRadius == radius, so this is exactly the original formula.
+	coreRadius := (size / 2) * hardness / 100
+	spacing := math.Max(coreRadius, 1) // never coarser than 1 subpixel, so thin strokes are unaffected
 	steps := int(length / spacing)
 	if steps < 1 {
 		steps = 1
@@ -570,6 +578,17 @@ func (r *Raster) plotThickHard(x, y, radius float64, color string) {
 	}
 }
 
+// glyphDensity returns g's index into hardnessGlyphs (0 = solid, higher =
+// sparser) and whether g is actually one of them.
+func glyphDensity(g rune) (level int, ok bool) {
+	for i, hg := range hardnessGlyphs {
+		if g == hg {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
 // plotThickSoft renders a disc of the given hardness (0..100, exclusive
 // of 100 — see plotThick) by walking whole terminal cells rather than
 // subpixels: every cell within coreRadius (radius scaled by hardness)
@@ -595,24 +614,39 @@ func (r *Raster) plotThickSoft(x, y, radius, hardness float64, color string) {
 			if d > radius {
 				continue
 			}
+			idx := 0
+			if d > coreRadius {
+				t := 1.0
+				if band > 0 {
+					t = (d - coreRadius) / band
+				}
+				idx = int(t * float64(len(hardnessGlyphs)))
+				if idx >= len(hardnessGlyphs) {
+					idx = len(hardnessGlyphs) - 1
+				}
+			}
+
 			cell := r.at(col, row)
+			// A soft brush is drawn as many overlapping disc stamps
+			// along its path (see drawSegment); a cell near the middle
+			// of the stroke sits close to one stamp's center (call for
+			// a solid glyph) but only within a neighboring stamp's
+			// outer band (call for a sparser one). Without this check,
+			// whichever stamp happened to be processed last would win
+			// regardless of which one was actually closer, which — since
+			// stamps overlap heavily — meant most of the stroke's
+			// interior flickered between densities in a checkerboard
+			// instead of reading as one continuous solid core. Same
+			// color only: a different edit or color legitimately
+			// overwrites, same as everywhere else in this renderer.
+			if existing, ok := glyphDensity(cell.glyph); ok && cell.color == color && existing < idx {
+				continue
+			}
 			// A soft splat supersedes any braille dots this cell had —
 			// mixing subpixel dots and a cell-wide glyph in the same
 			// cell isn't representable, so the glyph wins.
 			cell.dots = 0
 			cell.color = color
-			if d <= coreRadius {
-				cell.glyph = '█'
-				continue
-			}
-			t := 1.0
-			if band > 0 {
-				t = (d - coreRadius) / band
-			}
-			idx := int(t * float64(len(hardnessGlyphs)))
-			if idx >= len(hardnessGlyphs) {
-				idx = len(hardnessGlyphs) - 1
-			}
 			cell.glyph = hardnessGlyphs[idx]
 		}
 	}

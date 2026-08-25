@@ -46,6 +46,30 @@ func TestHardnessSoftEdgeFeathers(t *testing.T) {
 	}
 }
 
+// TestHardnessDraggedStrokeHasNoCheckerboard is the regression test for a
+// real rendering bug: a soft brush is drawn as many overlapping disc
+// stamps along its drag path, and a cell near the middle of the stroke
+// sits close to one stamp's center (solid) but only within a neighboring
+// stamp's sparser outer band. Without keeping the densest classification
+// any stamp assigned a cell, whichever stamp got processed last won
+// regardless of which was actually closer — since stamps overlap
+// heavily, nearly the whole interior of a dragged stroke alternated
+// between densities in a visible checkerboard instead of reading as one
+// continuous solid core with a feathered edge.
+func TestHardnessDraggedStrokeHasNoCheckerboard(t *testing.T) {
+	e := &Edit{ID: 1, Kind: KindStroke, Points: []Point{{X: 10, Y: 30}, {X: 150, Y: 30}}, Color: "#fff", Size: 20, Hardness: 40}
+	r := RasterizeDocument([]*Edit{e}, 80, 15, 0, 0, 1, "", 0, "")
+
+	// Well clear of both endpoints, the interior of the capsule's core
+	// row should be solid the entire way across — not alternating with
+	// sparser glyphs.
+	for col := 10; col < 70; col++ {
+		if g := r.at(col, 7).glyph; g != '█' {
+			t.Fatalf("expected a solid core all the way along the stroke's interior, got %q at col %d", g, col)
+		}
+	}
+}
+
 // TestHardnessZeroTreatedAsFull covers the file-compatibility sentinel:
 // Edit.Hardness's zero value (what an old save file unmarshals to, since
 // the field didn't exist) must mean fully hard, not 0% (invisible).
