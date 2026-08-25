@@ -73,7 +73,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.km.NewTab):
 		m.doNewTab()
 	case key.Matches(msg, m.km.CloseTab):
-		m.doCloseTab(m.active)
+		if m.doCloseTab(m.active) {
+			return m, tea.Quit
+		}
 	case key.Matches(msg, m.km.NextTab):
 		m.doSelectTab((m.active + 1) % len(m.tabs))
 	case key.Matches(msg, m.km.PrevTab):

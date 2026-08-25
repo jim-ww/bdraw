@@ -21,11 +21,15 @@ func (m *Model) startPrompt(mo mode, prefill string) {
 // open, text tool entry, or close confirmation) has focus.
 func (m Model) handlePromptKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.mode == modeConfirmClose {
+		var quit bool
 		switch msg.String() {
 		case "y", "enter":
-			m.closeTab(m.pendingCloseIdx)
+			quit = m.closeTab(m.pendingCloseIdx)
 		}
 		m.mode = modeNormal
+		if quit {
+			return m, tea.Quit
+		}
 		return m, nil
 	}
 

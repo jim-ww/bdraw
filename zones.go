@@ -203,7 +203,9 @@ func (m Model) handleZoneClick(id string) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			if id == zoneTabClose(i) {
-				m.doCloseTab(i)
+				if m.doCloseTab(i) {
+					return m, tea.Quit
+				}
 				return m, nil
 			}
 		}

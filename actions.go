@@ -121,27 +121,34 @@ func (m *Model) doSelectTab(i int) {
 
 // doCloseTab closes tab i, prompting for confirmation first if it has
 // unsaved changes.
-func (m *Model) doCloseTab(i int) {
+// doCloseTab closes tab i, prompting for confirmation first if it has
+// unsaved changes. Reports whether the program should quit as a result
+// (closing the last tab), so the caller can issue tea.Quit.
+func (m *Model) doCloseTab(i int) bool {
 	if i < 0 || i >= len(m.tabs) {
-		return
+		return false
 	}
 	if m.tabs[i].Dirty {
 		m.mode = modeConfirmClose
 		m.pendingCloseIdx = i
-		return
+		return false
 	}
-	m.closeTab(i)
+	return m.closeTab(i)
 }
 
-func (m *Model) closeTab(i int) {
+// closeTab removes tab i. Closing the last remaining tab quits the
+// program, matching what almost every tabbed editor does, rather than
+// silently replacing it with a blank Untitled document.
+func (m *Model) closeTab(i int) bool {
 	clearAutosave(m.tabs[i])
 	m.tabs = append(m.tabs[:i], m.tabs[i+1:]...)
 	if len(m.tabs) == 0 {
-		m.tabs = []*Document{NewDocument()}
+		return true
 	}
 	if m.active >= len(m.tabs) {
 		m.active = len(m.tabs) - 1
 	}
+	return false
 }
 
 // pasteOffset nudges a paste from its source position (world subpixels),

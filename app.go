@@ -265,7 +265,14 @@ func (m Model) Init() tea.Cmd {
 	return autosaveTick()
 }
 
+// doc returns the active document. Guarded against an empty m.tabs: after
+// closing the last tab we return tea.Quit, but bubbletea still renders one
+// more frame on the model that returned it before actually exiting, and
+// that frame's View() calls doc() same as any other.
 func (m *Model) doc() *Document {
+	if len(m.tabs) == 0 {
+		return NewDocument()
+	}
 	return m.tabs[m.active]
 }
 
