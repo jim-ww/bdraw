@@ -132,9 +132,11 @@ func (m Model) handleZoneClick(id string) (tea.Model, tea.Cmd) {
 	// actions through this zone-click path instead of a keybind, so the
 	// guard has to be duplicated here rather than caught once.
 	if m.hub != nil {
-		switch id {
-		case zoneNew, zoneOpen, zoneSave, zoneSaveAs, zoneExport:
-			return m, nil
+		if !m.isHost {
+			switch id {
+			case zoneNew, zoneOpen, zoneSave, zoneSaveAs, zoneExport:
+				return m, nil
+			}
 		}
 		if m.readOnly {
 			switch {

@@ -17,14 +17,14 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// No collab peer — host or guest, read-only or not — ever touches
-	// local disk through the shared session: Save/SaveAs/Open/Export all
-	// read or write files on whatever machine is running the *server*,
-	// and the collab server has no auth, so letting a guest trigger them
-	// would mean any anonymous connection could read or write arbitrary
-	// paths on the host's filesystem. The host's own separate local
-	// terminal session (m.hub == nil there) is unaffected.
-	if m.hub != nil && isFileIOKey(m.km, msg) {
+	// No collab guest — read-only or not — ever touches local disk
+	// through the shared session: Save/SaveAs/Open/Export all read or
+	// write files on whatever machine is running the *server*, and the
+	// collab server has no auth, so letting a guest trigger them would
+	// mean any anonymous connection could read or write arbitrary paths
+	// on the host's filesystem. The host itself (m.isHost) is exempt —
+	// those actions touch its own disk either way, collab or not.
+	if m.hub != nil && !m.isHost && isFileIOKey(m.km, msg) {
 		return m, nil
 	}
 

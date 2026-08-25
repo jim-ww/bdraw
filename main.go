@@ -93,6 +93,7 @@ func main() {
 	m.hub = hub
 	m.peerID = id
 	m.peerName = "host"
+	m.isHost = true
 	m.peerColor = color
 	m.readOnly = false // the host always has full rights, regardless of -collab-readonly
 

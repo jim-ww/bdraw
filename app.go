@@ -222,20 +222,29 @@ type Model struct {
 	// canvasCache, so writes through it persist. See viewCanvas.
 	cache *canvasCache
 
-	// hub is non-nil only for an SSH collaboration session (see
-	// collab.go): m.tabs[0] then points at the Hub's shared *Document
-	// rather than a private one, m.peerID/peerName/peerColor identify
-	// this connection to everyone else, and every mouse/key event routes
-	// through collabWrap to serialize edits and broadcast cursor moves.
+	// hub is non-nil for every peer in an SSH collaboration session,
+	// host included (see collab.go and main.go): m.tabs then mirrors the
+	// Hub's shared tab list rather than a private one, m.peerID/peerName/
+	// peerColor identify this connection to everyone else, and every
+	// mouse/key event routes through collabWrap to serialize edits and
+	// broadcast cursor/tab changes.
 	hub       *Hub
 	peerID    int
 	peerName  string
 	peerColor string
 
+	// isHost is true only for the host's own local terminal session, not
+	// any guest — the host is a Hub peer like everyone else (so its edits
+	// and tab changes broadcast out too), but it still needs to be
+	// distinguishable from guests for the handful of things that stay
+	// host-only regardless of read-only status: local file I/O
+	// (Save/SaveAs/Open/Export always touch the *host's* disk — see
+	// isFileIOKey in keys.go) and never being subject to readOnly.
+	isHost bool
+
 	// readOnly disables every action that mutates the document — set for
-	// guests on a collab server started with the read-only flag. The host
-	// itself never goes through this (its Model has no hub at all; it
-	// runs the ordinary local UI while the Hub's doc is what's shared).
+	// guests on a collab server started with the read-only flag. Never
+	// true for the host (see isHost).
 	readOnly bool
 
 	// peerCursors holds every other connected peer's last-broadcast
