@@ -311,6 +311,22 @@ func (m *Model) saveTo(path string) {
 	}
 }
 
+// openInitialFile loads path (given as a CLI argument) as the starting
+// document, replacing the blank Untitled tab NewModel already created —
+// unlike openFrom, which always adds a new tab. Failure just leaves the
+// blank tab in place with an error status, rather than refusing to start.
+func (m *Model) openInitialFile(path string) {
+	d, err := LoadDocument(path)
+	if err != nil {
+		m.status = fmt.Sprintf("open failed: %v", err)
+		return
+	}
+	m.tabs[0] = d
+	m.active = 0
+	m.status = "opened " + path
+	m.rememberFile(path)
+}
+
 func (m *Model) openFrom(path string) {
 	d, err := LoadDocument(path)
 	if err != nil {

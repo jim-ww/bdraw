@@ -12,7 +12,12 @@ import (
 func main() {
 	zone.NewGlobal()
 
-	p := tea.NewProgram(NewModel())
+	m := NewModel()
+	if len(os.Args) > 1 {
+		m.openInitialFile(os.Args[1])
+	}
+
+	p := tea.NewProgram(m)
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "bdraw:", err)
 		os.Exit(1)
