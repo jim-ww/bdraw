@@ -18,11 +18,15 @@ type Document struct {
 	// off it to know when a full re-rasterize is actually necessary,
 	// versus when only the mouse cursor moved.
 	Version int
+
+	// autosaveID names this document's recovery file for the life of the
+	// session (see autosave.go) — stable even before it has a real Path.
+	autosaveID string
 }
 
 // NewDocument returns an empty, untitled document.
 func NewDocument() *Document {
-	return &Document{Zoom: 1}
+	return &Document{Zoom: 1, autosaveID: newAutosaveID()}
 }
 
 // Title is what a tab shows: the base filename, or "Untitled" plus a dirty

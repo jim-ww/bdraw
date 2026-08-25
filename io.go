@@ -42,9 +42,14 @@ func LoadDocument(path string) (*Document, error) {
 	return d, nil
 }
 
+// marshalFileFormat is the JSON encoding shared by Save and autosave.
+func marshalFileFormat(d *Document) ([]byte, error) {
+	return json.MarshalIndent(fileFormat{Version: CurrentFileVersion, Edits: d.Edits}, "", "  ")
+}
+
 // Save writes the document as JSON to path.
 func (d *Document) Save(path string) error {
-	data, err := json.MarshalIndent(fileFormat{Version: CurrentFileVersion, Edits: d.Edits}, "", "  ")
+	data, err := marshalFileFormat(d)
 	if err != nil {
 		return fmt.Errorf("marshal document: %w", err)
 	}
@@ -53,6 +58,7 @@ func (d *Document) Save(path string) error {
 	}
 	d.Path = path
 	d.Dirty = false
+	clearAutosave(d)
 	return nil
 }
 

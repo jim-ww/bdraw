@@ -13,6 +13,14 @@ type Config struct {
 	// default — the glyphs are compact but not self-explanatory; set
 	// "icons": true in the config file to enable them.
 	UseIcons bool `json:"icons"`
+
+	// Palette overrides the default color-picker swatches, as a list of
+	// "#rrggbb" strings. Leave unset to keep the built-in palette.
+	Palette []string `json:"palette,omitempty"`
+
+	// DefaultColor overrides the color a new document starts with (also
+	// "#rrggbb"). Leave unset to keep the built-in default (white).
+	DefaultColor string `json:"default_color,omitempty"`
 }
 
 func DefaultConfig() Config {

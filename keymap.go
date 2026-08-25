@@ -94,11 +94,18 @@ func DefaultKeyMap() KeyMap {
 		Export: bind([]string{"ctrl+e"}, "export"),
 		Clear:  bind([]string{"ctrl+x"}, "clear canvas"),
 
-		ColorPicker:   bind([]string{"p"}, "color picker"),
-		ToggleGrid:    bind([]string{"g"}, "toggle grid"),
-		ToggleSnap:    bind([]string{"n"}, "toggle snap to grid"),
-		ToggleFill:    bind([]string{"ctrl+f"}, "toggle filled shapes"),
-		ToggleCompact: bind([]string{"h"}, "toggle compact toolbar"),
+		ColorPicker: bind([]string{"p"}, "color picker"),
+		ToggleGrid:  bind([]string{"g"}, "toggle grid"),
+		ToggleSnap:  bind([]string{"n"}, "toggle snap to grid"),
+		ToggleFill:  bind([]string{"ctrl+f"}, "toggle filled shapes"),
+		// ctrl+m is included per request, but heads up: on most terminals
+		// without kitty-protocol keyboard disambiguation, ctrl+m is
+		// byte-for-byte indistinguishable from Enter. Since Enter already
+		// means something in several modes (confirming prompts, size/zoom
+		// entry), that alias may fire unexpectedly there. 'h' is kept as
+		// the reliable default; override via config if you don't want
+		// ctrl+m at all.
+		ToggleCompact: bind([]string{"h", "ctrl+m"}, "toggle compact toolbar"),
 
 		NextTab:  bind([]string{"tab"}, "next tab"),
 		PrevTab:  bind([]string{"shift+tab"}, "prev tab"),

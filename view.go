@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math"
 	"strings"
 
@@ -44,6 +45,10 @@ func (m Model) View() tea.View {
 		b.WriteString(m.viewNumberSlider())
 		b.WriteString("\n")
 	}
+	if m.mode == modePromptOpen && len(m.recent) > 0 {
+		b.WriteString(m.viewRecentFiles())
+		b.WriteString("\n")
+	}
 	b.WriteString(m.viewCanvas())
 	b.WriteString("\n")
 	b.WriteString(m.viewStatus())
@@ -65,7 +70,21 @@ func (m Model) headerHeight() int {
 	if m.mode == modeNumberEntry {
 		h += strings.Count(m.viewNumberSlider(), "\n") + 1
 	}
+	if m.mode == modePromptOpen && len(m.recent) > 0 {
+		h += strings.Count(m.viewRecentFiles(), "\n") + 1
+	}
 	return h
+}
+
+// viewRecentFiles renders the numbered recent-files list shown below the
+// Open prompt: press a digit (with the path field empty) to open directly.
+func (m Model) viewRecentFiles() string {
+	var b strings.Builder
+	b.WriteString("recent (press a number):")
+	for i, p := range m.recent {
+		fmt.Fprintf(&b, "\n  %d. %s", i+1, p)
+	}
+	return modalStyle.Render(b.String())
 }
 
 // wrapButtons packs pre-rendered, already-styled button strings onto as few

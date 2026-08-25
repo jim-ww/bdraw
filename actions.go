@@ -134,6 +134,7 @@ func (m *Model) doCloseTab(i int) {
 }
 
 func (m *Model) closeTab(i int) {
+	clearAutosave(m.tabs[i])
 	m.tabs = append(m.tabs[:i], m.tabs[i+1:]...)
 	if len(m.tabs) == 0 {
 		m.tabs = []*Document{NewDocument()}
@@ -298,6 +299,7 @@ func (m *Model) saveTo(path string) {
 			return
 		}
 		m.status = "saved " + path
+		m.rememberFile(path)
 	}
 }
 
@@ -310,4 +312,15 @@ func (m *Model) openFrom(path string) {
 	m.tabs = append(m.tabs, d)
 	m.active = len(m.tabs) - 1
 	m.status = "opened " + path
+	m.rememberFile(path)
+}
+
+// rememberFile adds path to the recent-files list (JSON documents only —
+// PNG/SVG exports aren't reopenable) and persists it.
+func (m *Model) rememberFile(path string) {
+	if IsPNGPath(path) || IsSVGPath(path) {
+		return
+	}
+	m.recent = rememberRecentFile(m.recent, path)
+	saveRecentFiles(m.recent)
 }

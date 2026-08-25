@@ -2,6 +2,14 @@ package main
 
 import tea "charm.land/bubbletea/v2"
 
+// digitKey reports whether s is a single ASCII digit, and its value.
+func digitKey(s string) (int, bool) {
+	if len(s) != 1 || s[0] < '0' || s[0] > '9' {
+		return 0, false
+	}
+	return int(s[0] - '0'), true
+}
+
 func (m *Model) startPrompt(mo mode, prefill string) {
 	m.mode = mo
 	m.input.SetValue(prefill)
@@ -28,6 +36,18 @@ func (m Model) handlePromptKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.mode = modeNormal
 		return m, nil
+	}
+
+	// While the open prompt's path field is empty, digits pick a recent
+	// file directly instead of being typed — a blank field has nothing
+	// else a digit could mean.
+	if m.mode == modePromptOpen && m.input.Value() == "" {
+		if n, ok := digitKey(msg.String()); ok && n >= 1 && n <= len(m.recent) {
+			m.openFrom(m.recent[n-1])
+			m.mode = modeNormal
+			m.input.Blur()
+			return m, nil
+		}
 	}
 
 	switch msg.String() {

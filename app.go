@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math"
 
 	"charm.land/bubbles/v2/textinput"
@@ -62,11 +63,30 @@ func (m Model) cursorColor() string {
 }
 
 // Palette is the fixed set of quick-pick colors offered in the color-picker
-// modal.
+// modal. Overridable via Config.Palette (see applyPaletteOverride).
 var Palette = []string{
 	"#ffffff", "#ff0000", "#00ff00", "#0000ff",
 	"#ffff00", "#ff00ff", "#00ffff", "#808080",
 	"#000000",
+}
+
+// applyPaletteOverride replaces Palette with cfg's, if it's non-empty and
+// every entry is a valid hex color — an invalid config value falls back to
+// the built-in palette rather than leaving the app with a broken color
+// picker.
+func applyPaletteOverride(custom []string) {
+	if len(custom) == 0 {
+		return
+	}
+	normalized := make([]string, len(custom))
+	for i, c := range custom {
+		v, ok := normalizeHexColor(c)
+		if !ok {
+			return
+		}
+		normalized[i] = v
+	}
+	Palette = normalized
 }
 
 const (
@@ -144,6 +164,10 @@ type Model struct {
 	selectStart Point
 	selectLast  Point
 
+	// recent is the most-recent-first list of opened/saved document paths,
+	// persisted to ~/.config/bdraw/recent.json.
+	recent []string
+
 	// clipboard holds copied edits (deep clones, so later mutation of the
 	// originals can't corrupt a pending paste). In-app only — not the OS
 	// clipboard.
@@ -205,25 +229,38 @@ type canvasCache struct {
 }
 
 func NewModel() Model {
+	cfg := LoadConfig()
+	applyPaletteOverride(cfg.Palette)
+	color := Palette[0]
+	if c, ok := normalizeHexColor(cfg.DefaultColor); ok {
+		color = c
+	}
+
+	status := "mouse to draw · b/r/c/l/a/e/s/t/m tools · scroll/[/] zoom · arrows/middle-drag pan · ctrl+q quit"
+	if leftover := findAutosaveFiles(); len(leftover) > 0 {
+		status = fmt.Sprintf("found %d autosave file(s) from a previous session in the autosave folder — open to recover", len(leftover))
+	}
+
 	ti := textinput.New()
 	ti.Prompt = "> "
 	return Model{
 		km:       LoadKeyMap(),
-		cfg:      LoadConfig(),
+		cfg:      cfg,
 		tabs:     []*Document{NewDocument()},
 		active:   0,
 		tool:     ToolBrush,
-		color:    Palette[0],
+		color:    color,
 		size:     1,
 		input:    ti,
 		cache:    &canvasCache{},
 		showGrid: true,
-		status:   "mouse to draw · b/r/c/l/a/e/s/t/m tools · scroll/[/] zoom · arrows/middle-drag pan · ctrl+q quit",
+		recent:   loadRecentFiles(),
+		status:   status,
 	}
 }
 
 func (m Model) Init() tea.Cmd {
-	return nil
+	return autosaveTick()
 }
 
 func (m *Model) doc() *Document {
@@ -238,6 +275,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.MouseMsg:
 		return m.handleMouse(msg)
+
+	case autosaveMsg:
+		m.runAutosave()
+		return m, autosaveTick()
 
 	case tea.KeyMsg:
 		if m.mode == modeColorPicker {
