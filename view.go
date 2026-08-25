@@ -254,12 +254,42 @@ func (m Model) viewColorPicker() string {
 // change it (edits, pan, zoom, viewport size, active tab) has changed.
 func (m Model) canvasRaster(cols, rows int, d *Document, zoom float64) *Raster {
 	c := m.cache
-	if c.raster != nil && c.doc == d && c.docVer == d.Version && c.highlightID == m.hoverEditID &&
-		c.cols == cols && c.rows == rows && c.offset == d.Offset && c.zoom == zoom {
+	sameView := c.raster != nil && c.doc == d && c.highlightID == m.hoverEditID &&
+		c.cols == cols && c.rows == rows && c.offset == d.Offset && c.zoom == zoom
+
+	if sameView && c.docVer == d.Version {
 		return c.raster
 	}
+
+	// Incremental fast path: an active brush drag calls Touch() exactly
+	// once per point appended, so if the current version is exactly the
+	// cached version plus the number of new points, nothing else could
+	// have touched the document in between — any other edit, toggle, or
+	// undo/redo would throw that arithmetic off and fall through to a
+	// full rebuild. Without this, every single motion event during a long
+	// drag re-rasterized the whole stroke from scratch, and that cost
+	// grew without bound the longer and faster you drew (see
+	// BenchmarkRasterizeDocument).
+	if sameView && m.dragging && m.tool == ToolBrush && m.dragEdit != nil &&
+		c.dragEditID == m.dragEdit.ID {
+		newPoints := len(m.dragEdit.Points) - c.dragPointsBaked
+		if newPoints > 0 && d.Version == c.docVer+newPoints {
+			c.raster.appendStroke(m.dragEdit.Points, c.dragPointsBaked, m.dragEdit.Size, d.Offset.X, d.Offset.Y, zoom, m.dragEdit.Color)
+			c.docVer = d.Version
+			c.dragPointsBaked = len(m.dragEdit.Points)
+			return c.raster
+		}
+	}
+
 	r := RasterizeDocument(d.Edits, cols, rows, d.Offset.X, d.Offset.Y, zoom, selectColor, m.hoverEditID, hoverEditColor)
-	*c = canvasCache{raster: r, cols: cols, rows: rows, offset: d.Offset, zoom: zoom, doc: d, docVer: d.Version, highlightID: m.hoverEditID}
+	dragEditID, dragPointsBaked := 0, 0
+	if m.dragging && m.tool == ToolBrush && m.dragEdit != nil {
+		dragEditID, dragPointsBaked = m.dragEdit.ID, len(m.dragEdit.Points)
+	}
+	*c = canvasCache{
+		raster: r, cols: cols, rows: rows, offset: d.Offset, zoom: zoom, doc: d, docVer: d.Version,
+		highlightID: m.hoverEditID, dragEditID: dragEditID, dragPointsBaked: dragPointsBaked,
+	}
 	return r
 }
 

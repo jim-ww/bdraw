@@ -228,6 +228,15 @@ type canvasCache struct {
 	doc         *Document
 	docVer      int
 	highlightID int
+
+	// dragEditID/dragPointsBaked support the incremental fast path for an
+	// actively-growing brush stroke (see canvasRaster in view.go): rather
+	// than re-rasterizing every point of the stroke on every single motion
+	// event — cost that grows without bound the longer and faster you
+	// draw — only the segments added since the last frame get drawn onto
+	// the already-cached raster.
+	dragEditID      int
+	dragPointsBaked int
 }
 
 func NewModel() Model {

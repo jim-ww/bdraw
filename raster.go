@@ -199,21 +199,27 @@ func (r *Raster) floodFill(e *Edit, ox, oy, zoom float64, color string) {
 	}
 }
 
+// maxScreenSize clamps screen-space thickness: past this point a fatter
+// brush is visually just a solid blob, but plotThick's cost grows with
+// radius, so an unclamped size*zoom (e.g. a fat brush at 800% zoom) makes
+// every point of every stroke drawn this frame far more expensive than the
+// extra thickness is worth.
+const maxScreenSize = 64
+
+func screenSize(size, zoom float64) float64 {
+	s := size * zoom
+	if s > maxScreenSize {
+		s = maxScreenSize
+	}
+	return s
+}
+
 func (r *Raster) drawEdit(e *Edit, ox, oy, zoom float64, color string) {
 	pts := make([]Point, len(e.Points))
 	for i, p := range e.Points {
 		pts[i] = Point{X: (p.X - ox) * zoom, Y: (p.Y - oy) * zoom}
 	}
-	// Clamp screen-space thickness: past a certain point a fatter brush is
-	// visually just a solid blob, but plotThick's cost is quadratic in
-	// radius, so an unclamped size*zoom (e.g. a fat brush at 800% zoom)
-	// makes every point of every stroke drawn this frame far more
-	// expensive than the extra thickness is worth.
-	const maxScreenSize = 64
-	size := e.Size * zoom
-	if size > maxScreenSize {
-		size = maxScreenSize
-	}
+	size := screenSize(e.Size, zoom)
 
 	switch e.Kind {
 	case KindStroke, KindLine:
@@ -234,6 +240,32 @@ func (r *Raster) drawEdit(e *Edit, ox, oy, zoom float64, color string) {
 		}
 	case KindText:
 		r.drawText(pts, e.Text, color)
+	}
+}
+
+// appendStroke draws only the newly-added segments of a growing stroke
+// (from index max(0,from-1), so the segment connecting to the
+// already-drawn portion is included) directly onto this raster. It mirrors
+// drawEdit's transform and clamp exactly, so incrementally appending is
+// pixel-identical to a full rebuild — see canvasRaster in view.go.
+func (r *Raster) appendStroke(pts []Point, from int, size, ox, oy, zoom float64, color string) {
+	s := screenSize(size, zoom)
+	transform := func(p Point) (float64, float64) {
+		return (p.X - ox) * zoom, (p.Y - oy) * zoom
+	}
+	if len(pts) == 1 {
+		x, y := transform(pts[0])
+		r.plotThick(x, y, s, color)
+		return
+	}
+	start := from - 1
+	if start < 0 {
+		start = 0
+	}
+	for i := start; i+1 < len(pts); i++ {
+		x0, y0 := transform(pts[i])
+		x1, y1 := transform(pts[i+1])
+		r.drawSegment(x0, y0, x1, y1, s, color)
 	}
 }
 
