@@ -6,6 +6,17 @@ import (
 )
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Switching tools mid-drag left m.tool and m.dragEdit inconsistent —
+	// e.g. a 1-point brush stroke, still being dragged, reinterpreted on
+	// the next motion event as a 2-point shape because m.tool had
+	// changed — and crashed indexing Points[1] on an edit that only had
+	// one point. A drag has to finish (or be abandoned by releasing the
+	// button) before the tool can change, same as every mouse-based paint
+	// program.
+	if m.dragging && isToolSwitchKey(m.km, msg) {
+		return m, nil
+	}
+
 	switch {
 	case key.Matches(msg, m.km.Quit):
 		return m, tea.Quit
@@ -111,4 +122,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.kbdActivate()
 	}
 	return m, nil
+}
+
+// isToolSwitchKey reports whether msg matches any tool-selection binding.
+func isToolSwitchKey(km KeyMap, msg tea.KeyMsg) bool {
+	return key.Matches(msg,
+		km.ToolBrush, km.ToolRect, km.ToolCircle, km.ToolLine, km.ToolEraser,
+		km.ToolSelect, km.ToolText, km.ToolMove, km.ToolFill, km.ToolArrow, km.ToolEyedropper,
+	)
 }

@@ -45,6 +45,20 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// A release landing on a toolbar zone (or anywhere outside the canvas)
+	// mid-drag must still finish the drag: MouseReleaseMsg isn't a
+	// MouseClickMsg, so it never matched the zone-click branch below, and
+	// — since only a MouseClickMsg or an actual canvas release ever
+	// called toolUp — that left m.dragging stuck true forever, extending
+	// whatever was being drawn on every later motion event regardless of
+	// tool. A release that *is* over the canvas still takes the normal
+	// path below, using its own exact position.
+	if _, ok := msg.(tea.MouseReleaseMsg); ok && m.dragging {
+		if _, _, overCanvas := m.canvasCell(msg); !overCanvas {
+			return m.toolUp(m.cellToPoint(m.cursorCol, m.cursorRow), false)
+		}
+	}
+
 	if id := m.zoneAt(msg); id != "" {
 		if id == zoneSlider && m.mode == modeNumberEntry {
 			switch msg.(type) {
