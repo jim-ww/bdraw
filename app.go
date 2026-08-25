@@ -242,6 +242,69 @@ type Model struct {
 	// cursor position, keyed by peer ID, so it can be drawn as a small
 	// dot with their name regardless of this viewer's own pan/zoom.
 	peerCursors map[int]peerCursor
+
+	// viewOffsets/viewZooms hold this peer's own private pan/zoom per
+	// Document, used only in a collab session — see viewOffset/viewZoom.
+	// Keyed by document pointer rather than tab index, since a collab
+	// peer's own tab list is a synced copy of the Hub's (see collab.go),
+	// not something safe to use as a stable index into private state.
+	viewOffsets map[*Document]Point
+	viewZooms   map[*Document]float64
+}
+
+// viewOffset and viewZoom return the effective pan/zoom for the active
+// document from this peer's own point of view. Solo, that's just the
+// document's own Offset/Zoom fields, same as always. In a collab session
+// every peer's Model shares the same *Document by pointer — but pan and
+// zoom are exploration, not document state, and panning shouldn't drag
+// everyone else's screen along with it, so collab peers keep their pan
+// and zoom in Model.viewOffsets/viewZooms instead of ever writing back to
+// the shared Document.
+func (m *Model) viewOffset() Point {
+	d := m.doc()
+	if m.hub == nil {
+		return d.Offset
+	}
+	if o, ok := m.viewOffsets[d]; ok {
+		return o
+	}
+	return d.Offset
+}
+
+func (m *Model) viewZoom() float64 {
+	d := m.doc()
+	z := d.Zoom
+	if m.hub != nil {
+		if v, ok := m.viewZooms[d]; ok {
+			z = v
+		}
+	}
+	if z == 0 {
+		z = 1
+	}
+	return z
+}
+
+func (m *Model) setViewOffset(p Point) {
+	if m.hub == nil {
+		m.doc().Offset = p
+		return
+	}
+	if m.viewOffsets == nil {
+		m.viewOffsets = map[*Document]Point{}
+	}
+	m.viewOffsets[m.doc()] = p
+}
+
+func (m *Model) setViewZoom(z float64) {
+	if m.hub == nil {
+		m.doc().Zoom = z
+		return
+	}
+	if m.viewZooms == nil {
+		m.viewZooms = map[*Document]float64{}
+	}
+	m.viewZooms[m.doc()] = z
 }
 
 // canvasCache holds the last rasterized canvas frame plus the exact view

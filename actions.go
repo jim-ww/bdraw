@@ -58,13 +58,9 @@ func (m *Model) zoomBy(factor float64) {
 // (or, for keyboard zoom, wherever it last was) instead of the view
 // jumping to re-center itself.
 func (m *Model) zoomAt(factor float64, col, row int) {
-	d := m.doc()
-	if d.Zoom == 0 {
-		d.Zoom = 1
-	}
 	worldBefore := m.cellToPoint(col, row)
 
-	newZoom := d.Zoom * factor
+	newZoom := m.viewZoom() * factor
 	if newZoom < zoomMin {
 		newZoom = zoomMin
 	}
@@ -74,14 +70,16 @@ func (m *Model) zoomAt(factor float64, col, row int) {
 	// Round the same way setSize does: repeated multiplicative steps
 	// otherwise drift into float noise in the displayed percentage.
 	newZoom = math.Round(newZoom*1000) / 1000
-	d.Zoom = newZoom
+	m.setViewZoom(newZoom)
 
 	sx := float64(col)*SubpixW + SubpixW/2
 	sy := float64(row)*SubpixH + SubpixH/2
-	d.Offset.X = worldBefore.X - sx/newZoom
-	d.Offset.Y = worldBefore.Y - sy/newZoom
+	m.setViewOffset(Point{
+		X: worldBefore.X - sx/newZoom,
+		Y: worldBefore.Y - sy/newZoom,
+	})
 
-	m.status = fmt.Sprintf("zoom %.0f%%", d.Zoom*100)
+	m.status = fmt.Sprintf("zoom %.0f%%", newZoom*100)
 }
 
 // zoomAtCursor zooms centered on the last known mouse position, if any,
@@ -96,9 +94,10 @@ func (m *Model) zoomAtCursor(factor float64) {
 }
 
 func (m *Model) panBy(dx, dy float64) {
-	d := m.doc()
-	d.Offset.X += dx
-	d.Offset.Y += dy
+	offset := m.viewOffset()
+	offset.X += dx
+	offset.Y += dy
+	m.setViewOffset(offset)
 }
 
 func (m *Model) doUndo() {

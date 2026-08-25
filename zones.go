@@ -29,16 +29,12 @@ func (m Model) canvasCell(msg tea.MouseMsg) (col, row int, ok bool) {
 // cellToPoint converts a screen cell in the canvas viewport to a world
 // coordinate, accounting for pan (Offset) and zoom.
 func (m Model) cellToPoint(col, row int) Point {
-	d := m.doc()
-	zoom := d.Zoom
-	if zoom == 0 {
-		zoom = 1
-	}
+	offset, zoom := m.viewOffset(), m.viewZoom()
 	sx := float64(col)*SubpixW + SubpixW/2
 	sy := float64(row)*SubpixH + SubpixH/2
 	return Point{
-		X: d.Offset.X + sx/zoom,
-		Y: d.Offset.Y + sy/zoom,
+		X: offset.X + sx/zoom,
+		Y: offset.Y + sy/zoom,
 	}
 }
 
@@ -207,7 +203,7 @@ func (m Model) handleZoneClick(id string) (tea.Model, tea.Cmd) {
 	case zoneZoomOut:
 		m.zoomAtCursor(1 / zoomStep)
 	case zoneZoomValue:
-		m.startNumberEntry("zoom", m.doc().Zoom*100)
+		m.startNumberEntry("zoom", m.viewZoom()*100)
 	case zoneGrid:
 		m.showGrid = !m.showGrid
 	case zoneSnap:

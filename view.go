@@ -179,7 +179,7 @@ func (m Model) compactToolbarLine() []string {
 		inactiveStyle.Render(toolLabel),
 		m.button(zoneFilled, "Filled: "+onOff(m.filled), m.filled),
 		m.button(zoneSizeValue, "size "+m.numberEntryLabel("size", "", m.size), m.mode == modeNumberEntry && m.numEntryTarget == "size"),
-		m.button(zoneZoomValue, "zoom "+m.numberEntryLabel("zoom", "%", m.doc().Zoom*100), m.mode == modeNumberEntry && m.numEntryTarget == "zoom"),
+		m.button(zoneZoomValue, "zoom "+m.numberEntryLabel("zoom", "%", m.viewZoom()*100), m.mode == modeNumberEntry && m.numEntryTarget == "zoom"),
 	}
 	return wrapButtons(buttons, m.width)
 }
@@ -215,7 +215,7 @@ func (m Model) toolbarLines() []string {
 		m.button(zoneSizeValue, "size "+m.numberEntryLabel("size", "", m.size), m.mode == modeNumberEntry && m.numEntryTarget == "size"),
 		m.button(zoneSizeInc, "+", false),
 		m.button(zoneZoomOut, "-", false),
-		m.button(zoneZoomValue, "zoom "+m.numberEntryLabel("zoom", "%", m.doc().Zoom*100), m.mode == modeNumberEntry && m.numEntryTarget == "zoom"),
+		m.button(zoneZoomValue, "zoom "+m.numberEntryLabel("zoom", "%", m.viewZoom()*100), m.mode == modeNumberEntry && m.numEntryTarget == "zoom"),
 		m.button(zoneZoomIn, "+", false),
 		m.button(zoneGrid, "Grid: "+onOff(m.showGrid), m.showGrid),
 		m.button(zoneSnap, "Snap: "+onOff(m.snap), m.snap),
@@ -252,10 +252,10 @@ func (m Model) viewColorPicker() string {
 // canvasRaster returns the rasterized canvas for the current document/view
 // state, reusing the previous frame's raster whenever nothing that would
 // change it (edits, pan, zoom, viewport size, active tab) has changed.
-func (m Model) canvasRaster(cols, rows int, d *Document, zoom float64) *Raster {
+func (m Model) canvasRaster(cols, rows int, d *Document, offset Point, zoom float64) *Raster {
 	c := m.cache
 	sameView := c.raster != nil && c.doc == d && c.highlightID == m.hoverEditID &&
-		c.cols == cols && c.rows == rows && c.offset == d.Offset && c.zoom == zoom
+		c.cols == cols && c.rows == rows && c.offset == offset && c.zoom == zoom
 
 	if sameView && c.docVer == d.Version {
 		return c.raster
@@ -274,7 +274,7 @@ func (m Model) canvasRaster(cols, rows int, d *Document, zoom float64) *Raster {
 		c.dragEditID == m.dragEdit.ID {
 		newPoints := len(m.dragEdit.Points) - c.dragPointsBaked
 		if newPoints > 0 && d.Version == c.docVer+newPoints {
-			c.raster.appendStroke(m.dragEdit.Points, c.dragPointsBaked, m.dragEdit.Size, d.Offset.X, d.Offset.Y, zoom, m.dragEdit.Color)
+			c.raster.appendStroke(m.dragEdit.Points, c.dragPointsBaked, m.dragEdit.Size, offset.X, offset.Y, zoom, m.dragEdit.Color)
 			c.docVer = d.Version
 			c.dragPointsBaked = len(m.dragEdit.Points)
 			return c.raster
@@ -299,13 +299,13 @@ func (m Model) canvasRaster(cols, rows int, d *Document, zoom float64) *Raster {
 		if m.dragEdit.Selected {
 			color = selectColor
 		}
-		r.drawEdit(m.dragEdit, d.Offset.X, d.Offset.Y, zoom, color)
+		r.drawEdit(m.dragEdit, offset.X, offset.Y, zoom, color)
 		c.raster = r
 		c.docVer = d.Version
 		return r
 	}
 
-	r := RasterizeDocument(d.Edits, cols, rows, d.Offset.X, d.Offset.Y, zoom, selectColor, m.hoverEditID, hoverEditColor)
+	r := RasterizeDocument(d.Edits, cols, rows, offset.X, offset.Y, zoom, selectColor, m.hoverEditID, hoverEditColor)
 	dragEditID, dragPointsBaked := 0, 0
 	var baseRaster *Raster
 	baseEditID, baseVer := 0, 0
@@ -313,11 +313,11 @@ func (m Model) canvasRaster(cols, rows int, d *Document, zoom float64) *Raster {
 		dragEditID, dragPointsBaked = m.dragEdit.ID, len(m.dragEdit.Points)
 	}
 	if m.dragging && isShapeDragTool(m.tool) && m.dragEdit != nil {
-		baseRaster = RasterizeDocument(withoutEdit(d.Edits, m.dragEdit.ID), cols, rows, d.Offset.X, d.Offset.Y, zoom, selectColor, m.hoverEditID, hoverEditColor)
+		baseRaster = RasterizeDocument(withoutEdit(d.Edits, m.dragEdit.ID), cols, rows, offset.X, offset.Y, zoom, selectColor, m.hoverEditID, hoverEditColor)
 		baseEditID, baseVer = m.dragEdit.ID, d.Version
 	}
 	*c = canvasCache{
-		raster: r, cols: cols, rows: rows, offset: d.Offset, zoom: zoom, doc: d, docVer: d.Version,
+		raster: r, cols: cols, rows: rows, offset: offset, zoom: zoom, doc: d, docVer: d.Version,
 		highlightID: m.hoverEditID, dragEditID: dragEditID, dragPointsBaked: dragPointsBaked,
 		baseRaster: baseRaster, baseEditID: baseEditID, baseVer: baseVer,
 	}
@@ -417,16 +417,13 @@ func (m Model) viewCanvas() string {
 		return ""
 	}
 	d := m.doc()
-	zoom := d.Zoom
-	if zoom == 0 {
-		zoom = 1
-	}
-	r := m.canvasRaster(cols, rows, d, zoom)
-	mx0, my0, mx1, my1, marquee := m.marqueeBounds(d.Offset, zoom)
+	offset, zoom := m.viewOffset(), m.viewZoom()
+	r := m.canvasRaster(cols, rows, d, offset, zoom)
+	mx0, my0, mx1, my1, marquee := m.marqueeBounds(offset, zoom)
 
 	// Other collab peers' cursors, converted from their broadcast world
 	// coordinates into this viewer's own screen cells — necessary since
-	// each connection can independently pan/zoom.
+	// each connection independently pans/zooms.
 	type peerDot struct {
 		ru    rune
 		color string
@@ -436,8 +433,8 @@ func (m Model) viewCanvas() string {
 		if !pc.Visible {
 			continue
 		}
-		col := int((pc.Pt.X - d.Offset.X) * zoom / SubpixW)
-		row := int((pc.Pt.Y - d.Offset.Y) * zoom / SubpixH)
+		col := int((pc.Pt.X - offset.X) * zoom / SubpixW)
+		row := int((pc.Pt.Y - offset.Y) * zoom / SubpixH)
 		if col < 0 || col >= cols || row < 0 || row >= rows {
 			continue
 		}
@@ -506,7 +503,7 @@ func (m Model) viewCanvas() string {
 					ru = '·'
 				}
 				color = selectColor
-			case m.showGrid && ru == ' ' && bg == "" && isGridDot(col, row, d.Offset, zoom):
+			case m.showGrid && ru == ' ' && bg == "" && isGridDot(col, row, offset, zoom):
 				ru, color = '·', gridDotColor
 			}
 

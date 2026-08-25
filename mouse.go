@@ -169,14 +169,12 @@ func (m *Model) handlePan(msg tea.MouseMsg, col, row int) (tea.Model, tea.Cmd) {
 		m.panLastCol, m.panLastRow = col, row
 	case tea.MouseMotionMsg:
 		if m.panning {
-			d := m.doc()
-			zoom := d.Zoom
-			if zoom == 0 {
-				zoom = 1
-			}
+			zoom := m.viewZoom()
+			offset := m.viewOffset()
 			dCol, dRow := col-m.panLastCol, row-m.panLastRow
-			d.Offset.X -= float64(dCol) * SubpixW / zoom
-			d.Offset.Y -= float64(dRow) * SubpixH / zoom
+			offset.X -= float64(dCol) * SubpixW / zoom
+			offset.Y -= float64(dRow) * SubpixH / zoom
+			m.setViewOffset(offset)
 			m.panLastCol, m.panLastRow = col, row
 		}
 	case tea.MouseReleaseMsg:
@@ -320,10 +318,7 @@ func constrainPoint(kind Kind, start, pt Point) Point {
 func (m *Model) toolDrag(pt Point, constrain bool) (tea.Model, tea.Cmd) {
 	switch m.tool {
 	case ToolBrush:
-		zoom := m.doc().Zoom
-		if zoom == 0 {
-			zoom = 1
-		}
+		zoom := m.viewZoom()
 		last := m.dragEdit.Points[len(m.dragEdit.Points)-1]
 		if distance(last, pt)*zoom >= minDragScreenDist {
 			m.dragEdit.Points = append(m.dragEdit.Points, pt)

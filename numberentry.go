@@ -45,12 +45,8 @@ func (m *Model) applyNumberEntryValue(v float64) {
 		m.setSize(v)
 		applied = m.size
 	case "zoom":
-		zoom := m.doc().Zoom
-		if zoom == 0 {
-			zoom = 1
-		}
-		m.zoomAtCursor(v / 100 / zoom)
-		applied = m.doc().Zoom * 100
+		m.zoomAtCursor(v / 100 / m.viewZoom())
+		applied = m.viewZoom() * 100
 	}
 	// Reflect what actually got applied (setSize/zoomAtCursor round and
 	// clamp), not the raw slider/arrow-key math — and format to a fixed 1
@@ -73,7 +69,7 @@ func (m Model) handleNumberEntryKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case "size":
 				m.setSize(v)
 			case "zoom":
-				m.zoomAtCursor(v / 100 / m.doc().Zoom)
+				m.zoomAtCursor(v / 100 / m.viewZoom())
 			}
 		} else {
 			m.status = "invalid number"
