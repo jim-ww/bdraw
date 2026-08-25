@@ -330,6 +330,9 @@ func isGridDot(col, row int, offset Point, zoom float64) bool {
 }
 
 func (m Model) viewCanvas() string {
+	if m.showHelp {
+		return m.viewHelp()
+	}
 	cols, rows := m.canvasSize()
 	if cols <= 0 || rows <= 0 {
 		return ""

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 
+	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 )
@@ -195,6 +196,7 @@ type Model struct {
 	filled   bool
 	compact  bool
 	snap     bool
+	showHelp bool
 
 	// numberEntry is the shared click-to-type-a-number state, used by both
 	// the size and zoom controls (see numberentry.go).
@@ -281,6 +283,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, autosaveTick()
 
 	case tea.KeyMsg:
+		if m.showHelp {
+			switch msg.String() {
+			case "?", "esc":
+				m.showHelp = false
+			}
+			return m, nil
+		}
+		if key.Matches(msg, m.km.Help) {
+			m.showHelp = true
+			return m, nil
+		}
 		if m.mode == modeColorPicker {
 			return m.handleColorPickerKey(msg)
 		}

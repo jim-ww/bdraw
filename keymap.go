@@ -59,6 +59,7 @@ type KeyMap struct {
 	ZoomOut  key.Binding
 
 	Quit key.Binding
+	Help key.Binding
 }
 
 // DefaultKeyMap is used for any binding not overridden by the user's
@@ -129,6 +130,7 @@ func DefaultKeyMap() KeyMap {
 		// "just kill it" muscle-memory key, so overloading it for quit
 		// risked an accidental copy silently eating a real interrupt too.
 		Quit: bind([]string{"ctrl+q"}, "quit"),
+		Help: bind([]string{"?"}, "toggle help"),
 	}
 }
 
@@ -207,6 +209,7 @@ func applyOverrides(km *KeyMap, overrides keyOverrides) {
 		"zoom_in":         &km.ZoomIn,
 		"zoom_out":        &km.ZoomOut,
 		"quit":            &km.Quit,
+		"help":            &km.Help,
 	}
 	for name, keys := range overrides {
 		b, ok := fields[name]
