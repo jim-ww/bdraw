@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sync/atomic"
 
 	tea "charm.land/bubbletea/v2"
 	zone "github.com/lrstanley/bubblezone/v2"
@@ -79,9 +80,12 @@ func main() {
 	// Same Join-before-Program-exists trick as serveCollabSession
 	// (collab.go): Join needs a Send callback, the Program needs the
 	// fully-populated model (with peerID/color from Join) to construct.
-	var p *tea.Program
+	// pRef is an atomic.Pointer rather than a plain var because
+	// broadcasts run on their own goroutine (see Hub.broadcastExcept) and
+	// could plausibly race the assignment below.
+	var pRef atomic.Pointer[tea.Program]
 	send := func(msg tea.Msg) {
-		if p != nil {
+		if p := pRef.Load(); p != nil {
 			p.Send(msg)
 		}
 	}
@@ -98,7 +102,8 @@ func main() {
 	}
 	m.status = fmt.Sprintf("collab server listening on %s — ssh <name>@host to join%s", *collabAddr, note)
 
-	p = tea.NewProgram(m)
+	p := tea.NewProgram(m)
+	pRef.Store(p)
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "bdraw:", err)
 		os.Exit(1)

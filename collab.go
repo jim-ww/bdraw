@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"sync/atomic"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/ssh"
@@ -118,7 +119,7 @@ func (h *Hub) Leave(id int) {
 	others := h.otherSendersLocked(id)
 	h.mu.Unlock()
 	for _, send := range others {
-		send(collabByeMsg{ID: id})
+		go send(collabByeMsg{ID: id})
 	}
 }
 
@@ -133,15 +134,28 @@ func (h *Hub) otherSendersLocked(exceptID int) []func(tea.Msg) {
 }
 
 // broadcastExcept sends msg to every peer other than fromID. Must be
-// called without h.mu held: peer.send is a *tea.Program.Send, which can
-// block briefly, and holding the doc lock across that would stall other
-// peers' edits for no reason.
+// called without h.mu held: peer.send is a *tea.Program.Send, which
+// writes to that program's unbuffered message channel and so blocks
+// until its event loop is idle and ready to receive.
+//
+// That send happens in its own goroutine, not inline on the caller's
+// goroutine, for a reason that isn't optional: the caller is itself
+// running inside a bubbletea Update() call (collabWrap calls this from
+// there), on that program's own single event-loop goroutine. If peer A
+// and peer B broadcast to each other at close enough to the same moment,
+// an inline send would have A's event-loop goroutine blocked writing to
+// B's channel while B's event-loop goroutine is simultaneously blocked
+// writing to A's — neither loop is ever back around to actually receive,
+// so both UIs freeze permanently. Sending from a fresh goroutine means
+// the caller's own event loop is free to keep reading immediately,
+// breaking that circular wait; the message still arrives, just not
+// synchronously with the broadcast call.
 func (h *Hub) broadcastExcept(fromID int, msg tea.Msg) {
 	h.mu.Lock()
 	senders := h.otherSendersLocked(fromID)
 	h.mu.Unlock()
 	for _, send := range senders {
-		send(msg)
+		go send(msg)
 	}
 }
 
@@ -230,13 +244,16 @@ func serveCollabSession(sess ssh.Session, hub *Hub, cfg Config) {
 	// Join needs a Send callback before the Program exists (its ID/color
 	// feed into the model the Program is constructed with), and the
 	// Program needs the fully-populated model before it exists — so this
-	// closure defers to whatever *tea.Program p ends up being, set right
-	// after construction and always resolved by the time any other peer's
-	// broadcast could actually reach it (the session hasn't started
-	// running yet).
-	var p *tea.Program
+	// closure defers to whatever *tea.Program pRef ends up holding, set
+	// right after construction. Broadcasts now run on their own goroutine
+	// (see broadcastExcept), so a peer could plausibly be sent a message
+	// in the brief window between Join and the Set below; pRef is an
+	// atomic.Pointer specifically so that race is a benign "message
+	// arrives a moment before the pointer is visible and gets dropped by
+	// the nil check" rather than a data race flagged by -race.
+	var pRef atomic.Pointer[tea.Program]
 	send := func(msg tea.Msg) {
-		if p != nil {
+		if p := pRef.Load(); p != nil {
 			p.Send(msg)
 		}
 	}
@@ -252,7 +269,8 @@ func serveCollabSession(sess ssh.Session, hub *Hub, cfg Config) {
 		tea.WithOutput(sess),
 		tea.WithContext(ctx),
 	}
-	p = tea.NewProgram(m, opts...)
+	p := tea.NewProgram(m, opts...)
+	pRef.Store(p)
 
 	go func() {
 		for {
