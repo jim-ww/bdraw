@@ -2,13 +2,19 @@ package main
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/pem"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/ssh"
+	gossh "golang.org/x/crypto/ssh"
 )
 
 // peerCursor is another connected peer's last-known canvas position, kept
@@ -200,12 +206,67 @@ func (m Model) collabWrap(fn func(Model) (tea.Model, tea.Cmd)) (tea.Model, tea.C
 // which is the one piece of "who is this" the SSH protocol reliably
 // exposes without inventing a separate handshake.
 func runCollabServer(addr string, hub *Hub, cfg Config) error {
+	signer, err := loadOrCreateHostKey()
+	if err != nil {
+		return fmt.Errorf("collab host key: %w", err)
+	}
+
 	s := &ssh.Server{
 		Addr:    addr,
 		Handler: func(sess ssh.Session) { serveCollabSession(sess, hub, cfg) },
 	}
+	s.AddHostKey(signer)
 	log.Printf("bdraw collab server listening on %s (read-only guests: %v)", addr, hub.readOnly)
 	return s.ListenAndServe()
+}
+
+// collabHostKeyPath is where the collab server's SSH host key is kept, in
+// bdraw's data dir (paths.go) alongside recent-files/autosave — it's
+// app-managed, not something a user edits, and losing it just means
+// guests see a one-time "host key changed" warning, not lost work.
+func collabHostKeyPath() (string, error) {
+	dir, err := dataDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "collab_host_ed25519"), nil
+}
+
+// loadOrCreateHostKey returns the collab server's persistent SSH host
+// key, generating and saving one on first use. Without this, ssh.Server
+// generates a fresh random key every process start (see
+// ensureHostSigner in charm.land/ssh), which makes every restart look
+// like a different, possibly-spoofed server to any guest who connected
+// before — SSH clients rightly refuse to proceed and warn about a
+// possible man-in-the-middle attack. A stable key means a guest only
+// ever has to accept the fingerprint once.
+func loadOrCreateHostKey() (gossh.Signer, error) {
+	path, err := collabHostKeyPath()
+	if err != nil {
+		return nil, err
+	}
+
+	if pemBytes, err := os.ReadFile(path); err == nil {
+		return gossh.ParsePrivateKey(pemBytes)
+	} else if !os.IsNotExist(err) {
+		return nil, err
+	}
+
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+	block, err := gossh.MarshalPrivateKey(priv, "bdraw collab host key")
+	if err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(path, pem.EncodeToMemory(block), 0o600); err != nil {
+		return nil, err
+	}
+	return gossh.NewSignerFromKey(priv)
 }
 
 // serveCollabSession wires one SSH session to its own bubbletea Program
