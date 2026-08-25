@@ -164,14 +164,15 @@ type Model struct {
 	pendingCloseIdx int
 
 	// drag state for the tool currently being dragged with the mouse
-	dragging    bool
-	dragEdit    *Edit
-	erasedIDs   map[int]bool
-	textPos     Point
-	moveTargets []*Edit
-	moveLast    Point
-	selectStart Point
-	selectLast  Point
+	dragging      bool
+	dragEdit      *Edit
+	dragConstrain bool // last real motion/click event's ctrl-drag state, replayed by edge-pan (see edgepan.go), which drives toolDrag without a fresh mouse event of its own
+	erasedIDs     map[int]bool
+	textPos       Point
+	moveTargets   []*Edit
+	moveLast      Point
+	selectStart   Point
+	selectLast    Point
 
 	// recent is the most-recent-first list of opened/saved document paths,
 	// persisted to ~/.config/bdraw/recent.json.
@@ -207,11 +208,12 @@ type Model struct {
 	// would act on.
 	hoverEditID int
 
-	showGrid bool
-	filled   bool
-	compact  bool
-	snap     bool
-	showHelp bool
+	showGrid    bool
+	filled      bool
+	compact     bool
+	snap        bool
+	showHelp    bool
+	showMinimap bool // off by default — a small overview of the whole drawing with the current viewport marked, see minimap.go
 
 	// colorPickerFocus is which palette swatch Tab/Shift+Tab currently has
 	// selected, for keyboard-only color switching; -1 = none focused yet.
@@ -414,7 +416,7 @@ func NewModel(configPath string) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return autosaveTick()
+	return tea.Batch(autosaveTick(), edgePanTick())
 }
 
 // doc returns the active document. Guarded against an empty m.tabs: after
@@ -489,6 +491,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case autosaveMsg:
 		m.runAutosave()
 		return m, autosaveTick()
+
+	case edgePanMsg:
+		return m.handleEdgePan()
 
 	case tea.KeyMsg:
 		return m.collabWrap(func(mm Model) (tea.Model, tea.Cmd) { return mm.handleKeyMsg(msg) })

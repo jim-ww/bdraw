@@ -62,6 +62,7 @@ func (m Model) helpSections() []helpSection {
 			he(km.ToggleSnap, "toggle snap"),
 			he(km.ToggleFill, "toggle filled shapes"),
 			he(km.ToggleCompact, "toggle compact toolbar"),
+			he(km.ToggleMinimap, "toggle minimap"),
 			he(km.Help, "toggle this help"),
 		}},
 		{"Navigate", []helpEntry{

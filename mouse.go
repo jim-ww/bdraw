@@ -113,6 +113,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	// Ctrl isn't conventionally claimed by terminals for anything at the
 	// mouse-protocol level, so it doesn't have this problem.
 	constrain := msg.Mouse().Mod&tea.ModCtrl != 0
+	m.dragConstrain = constrain
 
 	switch e := msg.(type) {
 	case tea.MouseClickMsg:

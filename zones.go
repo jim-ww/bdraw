@@ -70,6 +70,7 @@ const (
 	zoneGrid          = "grid"
 	zoneSnap          = "snap"
 	zoneFilled        = "filled"
+	zoneMinimap       = "minimap"
 
 	zoneColorButton = "color-button"
 	zoneZoomIn      = "zoom-in"
@@ -94,7 +95,7 @@ func (m Model) zoneIDs() []string {
 		zoneToolEraser, zoneToolSelect, zoneToolText, zoneToolMove, zoneToolFill, zoneToolArrow, zoneToolEyedropper,
 		zoneSizeInc, zoneSizeDec, zoneSizeValue, zoneColorButton, zoneZoomIn, zoneZoomOut, zoneZoomValue,
 		zoneHardnessInc, zoneHardnessDec, zoneHardnessValue,
-		zoneGrid, zoneSnap, zoneFilled, zoneNewTab, zoneCompact,
+		zoneGrid, zoneSnap, zoneFilled, zoneNewTab, zoneCompact, zoneMinimap,
 	}
 	if m.mode == modeColorPicker {
 		for i := range Palette {
@@ -224,6 +225,8 @@ func (m Model) handleZoneClick(id string) (tea.Model, tea.Cmd) {
 		m.filled = !m.filled
 	case zoneCompact:
 		m.compact = !m.compact
+	case zoneMinimap:
+		m.showMinimap = !m.showMinimap
 	case zoneNewTab:
 		m.doNewTab()
 

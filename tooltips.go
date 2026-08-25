@@ -38,6 +38,7 @@ func (m Model) bindingTooltips() map[string]key.Binding {
 		zoneGrid:        km.ToggleGrid,
 		zoneSnap:        km.ToggleSnap,
 		zoneFilled:      km.ToggleFill,
+		zoneMinimap:     km.ToggleMinimap,
 		zoneNewTab:      km.NewTab,
 	}
 }

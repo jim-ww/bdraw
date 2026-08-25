@@ -96,6 +96,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.filled = !m.filled
 	case key.Matches(msg, m.km.ToggleCompact):
 		m.compact = !m.compact
+	case key.Matches(msg, m.km.ToggleMinimap):
+		m.showMinimap = !m.showMinimap
 
 	case key.Matches(msg, m.km.NewTab):
 		m.doNewTab()

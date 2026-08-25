@@ -21,6 +21,15 @@ type Config struct {
 	// DefaultColor overrides the color a new document starts with (also
 	// "#rrggbb"). Leave unset to keep the built-in default (white).
 	DefaultColor string `json:"default_color,omitempty"`
+
+	// DisableEdgePan turns off auto-panning the canvas when the cursor
+	// reaches the viewport edge mid-drag (see edgepan.go). On by
+	// default; named/tagged so the default (edge-pan enabled) is what a
+	// config file gets by simply not mentioning it at all — Go's zero
+	// value for bool is already false here, matching "not disabled", and
+	// omitempty keeps a config file that doesn't care about this setting
+	// from ever needing to spell out the default.
+	DisableEdgePan bool `json:"disable_edge_pan,omitempty"`
 }
 
 func DefaultConfig() Config {

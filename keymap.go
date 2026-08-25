@@ -42,6 +42,7 @@ type KeyMap struct {
 	ToggleSnap    key.Binding
 	ToggleFill    key.Binding
 	ToggleCompact key.Binding
+	ToggleMinimap key.Binding
 
 	NextTab  key.Binding
 	PrevTab  key.Binding
@@ -120,6 +121,7 @@ func DefaultKeyMap() KeyMap {
 		// the reliable default; override via config if you don't want
 		// ctrl+m at all.
 		ToggleCompact: bind([]string{"h", "ctrl+m"}, "toggle compact toolbar"),
+		ToggleMinimap: bind([]string{"v"}, "toggle minimap"),
 
 		NextTab:  bind([]string{"tab"}, "next tab"),
 		PrevTab:  bind([]string{"shift+tab"}, "prev tab"),
@@ -219,6 +221,7 @@ func applyOverrides(km *KeyMap, overrides keyOverrides) {
 		"toggle_snap":      &km.ToggleSnap,
 		"toggle_fill":      &km.ToggleFill,
 		"toggle_compact":   &km.ToggleCompact,
+		"toggle_minimap":   &km.ToggleMinimap,
 		"next_tab":         &km.NextTab,
 		"prev_tab":         &km.PrevTab,
 		"close_tab":        &km.CloseTab,

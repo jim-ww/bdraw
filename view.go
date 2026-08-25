@@ -222,6 +222,7 @@ func (m Model) toolbarLines() []string {
 		m.button(zoneZoomIn, "+", false),
 		m.button(zoneGrid, "Grid: "+onOff(m.showGrid), m.showGrid),
 		m.button(zoneSnap, "Snap: "+onOff(m.snap), m.snap),
+		m.button(zoneMinimap, "Minimap: "+onOff(m.showMinimap), m.showMinimap),
 	}
 	return wrapButtons(buttons, m.width)
 }
@@ -455,6 +456,8 @@ func (m Model) viewCanvas() string {
 		}
 	}
 
+	minimapAt := m.minimapOverlay(cols, rows, d, offset, zoom)
+
 	type styleKey struct{ fg, bg string }
 	styles := map[styleKey]lipgloss.Style{}
 	styleFor := func(k styleKey) lipgloss.Style {
@@ -494,8 +497,11 @@ func (m Model) viewCanvas() string {
 			ru, color := r.Rune(col, row)
 			bg := r.Background(col, row)
 			pd, isPeer := peerAt[[2]int{col, row}]
+			mc, isMinimap := minimapAt[[2]int{col, row}]
 
 			switch {
+			case isMinimap:
+				ru, color, bg = mc.ru, mc.color, ""
 			case m.cursorVisible && m.mode == modeNormal && col == m.cursorCol && row == m.cursorRow:
 				ru, color = toolCursor[m.tool], m.cursorColor()
 			case isPeer:
