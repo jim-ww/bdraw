@@ -80,6 +80,13 @@ func (m Model) helpSections() []helpSection {
 			he(km.NextTab, "next tab"),
 			he(km.PrevTab, "prev tab"),
 		}},
+		{"Keyboard cursor (no mouse)", []helpEntry{
+			he(km.KbdCursorUp, "move cursor up"),
+			he(km.KbdCursorDown, "move cursor down"),
+			he(km.KbdCursorLeft, "move cursor left"),
+			he(km.KbdCursorRight, "move cursor right"),
+			he(km.KbdActivate, "click / release"),
+		}},
 	}
 }
 

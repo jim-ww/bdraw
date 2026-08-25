@@ -98,6 +98,17 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.zoomAtCursor(zoomStep)
 	case key.Matches(msg, m.km.ZoomOut):
 		m.zoomAtCursor(1 / zoomStep)
+
+	case key.Matches(msg, m.km.KbdCursorUp):
+		m.kbdMove(0, -1)
+	case key.Matches(msg, m.km.KbdCursorDown):
+		m.kbdMove(0, 1)
+	case key.Matches(msg, m.km.KbdCursorLeft):
+		m.kbdMove(-1, 0)
+	case key.Matches(msg, m.km.KbdCursorRight):
+		m.kbdMove(1, 0)
+	case key.Matches(msg, m.km.KbdActivate):
+		m.kbdActivate()
 	}
 	return m, nil
 }

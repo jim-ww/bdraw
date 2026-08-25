@@ -187,6 +187,13 @@ type Model struct {
 	// button, tab, swatch), so buttons can highlight on hover.
 	hoverZone string
 
+	// kbdCol/kbdRow are the keyboard cursor's absolute terminal position
+	// (see kbd.go) — lazily initialized to the viewport center on first
+	// use so a mouse-free session doesn't need any separate "enable"
+	// step.
+	kbdCol, kbdRow int
+	kbdInit        bool
+
 	// hoverEditID is the edit currently under the cursor for the move and
 	// eraser tools (0 = none), highlighted so it's clear what a click
 	// would act on.

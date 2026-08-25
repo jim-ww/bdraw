@@ -55,8 +55,18 @@ type KeyMap struct {
 	PanDown  key.Binding
 	PanLeft  key.Binding
 	PanRight key.Binding
-	ZoomIn   key.Binding
-	ZoomOut  key.Binding
+
+	// Keyboard cursor (full mouse-free operation): Shift+Arrow moves a
+	// virtual pointer, Activate simulates a left-button press/release at
+	// its position — reusing the exact mouse-handling code path, so every
+	// tool, button, and drag works identically to real mouse input.
+	KbdCursorUp    key.Binding
+	KbdCursorDown  key.Binding
+	KbdCursorLeft  key.Binding
+	KbdCursorRight key.Binding
+	KbdActivate    key.Binding
+	ZoomIn         key.Binding
+	ZoomOut        key.Binding
 
 	Quit key.Binding
 	Help key.Binding
@@ -120,6 +130,12 @@ func DefaultKeyMap() KeyMap {
 		PanDown:  bind([]string{"down"}, "pan down"),
 		PanLeft:  bind([]string{"left"}, "pan left"),
 		PanRight: bind([]string{"right"}, "pan right"),
+
+		KbdCursorUp:    bind([]string{"shift+up"}, "move keyboard cursor up"),
+		KbdCursorDown:  bind([]string{"shift+down"}, "move keyboard cursor down"),
+		KbdCursorLeft:  bind([]string{"shift+left"}, "move keyboard cursor left"),
+		KbdCursorRight: bind([]string{"shift+right"}, "move keyboard cursor right"),
+		KbdActivate:    bind([]string{"space"}, "click at keyboard cursor"),
 		// Not ctrl+=/ctrl+-: most terminal emulators intercept those
 		// themselves for their own font-size zoom, so the app would never
 		// even see the keypress. Brackets are rarely claimed by anything.
@@ -168,48 +184,53 @@ func keymapConfigPath() (string, error) {
 
 func applyOverrides(km *KeyMap, overrides keyOverrides) {
 	fields := map[string]*key.Binding{
-		"tool_brush":      &km.ToolBrush,
-		"tool_rect":       &km.ToolRect,
-		"tool_circle":     &km.ToolCircle,
-		"tool_line":       &km.ToolLine,
-		"tool_eraser":     &km.ToolEraser,
-		"tool_select":     &km.ToolSelect,
-		"tool_text":       &km.ToolText,
-		"tool_move":       &km.ToolMove,
-		"tool_fill":       &km.ToolFill,
-		"tool_arrow":      &km.ToolArrow,
-		"tool_eyedropper": &km.ToolEyedropper,
-		"undo":            &km.Undo,
-		"redo":            &km.Redo,
-		"delete":          &km.Delete,
-		"clear_selection": &km.ClearSelection,
-		"copy":            &km.Copy,
-		"paste":           &km.Paste,
-		"new":             &km.New,
-		"open":            &km.Open,
-		"save":            &km.Save,
-		"save_as":         &km.SaveAs,
-		"export":          &km.Export,
-		"clear":           &km.Clear,
-		"color_picker":    &km.ColorPicker,
-		"toggle_grid":     &km.ToggleGrid,
-		"toggle_snap":     &km.ToggleSnap,
-		"toggle_fill":     &km.ToggleFill,
-		"toggle_compact":  &km.ToggleCompact,
-		"next_tab":        &km.NextTab,
-		"prev_tab":        &km.PrevTab,
-		"close_tab":       &km.CloseTab,
-		"new_tab":         &km.NewTab,
-		"size_inc":        &km.SizeInc,
-		"size_dec":        &km.SizeDec,
-		"pan_up":          &km.PanUp,
-		"pan_down":        &km.PanDown,
-		"pan_left":        &km.PanLeft,
-		"pan_right":       &km.PanRight,
-		"zoom_in":         &km.ZoomIn,
-		"zoom_out":        &km.ZoomOut,
-		"quit":            &km.Quit,
-		"help":            &km.Help,
+		"tool_brush":       &km.ToolBrush,
+		"tool_rect":        &km.ToolRect,
+		"tool_circle":      &km.ToolCircle,
+		"tool_line":        &km.ToolLine,
+		"tool_eraser":      &km.ToolEraser,
+		"tool_select":      &km.ToolSelect,
+		"tool_text":        &km.ToolText,
+		"tool_move":        &km.ToolMove,
+		"tool_fill":        &km.ToolFill,
+		"tool_arrow":       &km.ToolArrow,
+		"tool_eyedropper":  &km.ToolEyedropper,
+		"undo":             &km.Undo,
+		"redo":             &km.Redo,
+		"delete":           &km.Delete,
+		"clear_selection":  &km.ClearSelection,
+		"copy":             &km.Copy,
+		"paste":            &km.Paste,
+		"new":              &km.New,
+		"open":             &km.Open,
+		"save":             &km.Save,
+		"save_as":          &km.SaveAs,
+		"export":           &km.Export,
+		"clear":            &km.Clear,
+		"color_picker":     &km.ColorPicker,
+		"toggle_grid":      &km.ToggleGrid,
+		"toggle_snap":      &km.ToggleSnap,
+		"toggle_fill":      &km.ToggleFill,
+		"toggle_compact":   &km.ToggleCompact,
+		"next_tab":         &km.NextTab,
+		"prev_tab":         &km.PrevTab,
+		"close_tab":        &km.CloseTab,
+		"new_tab":          &km.NewTab,
+		"size_inc":         &km.SizeInc,
+		"size_dec":         &km.SizeDec,
+		"pan_up":           &km.PanUp,
+		"pan_down":         &km.PanDown,
+		"pan_left":         &km.PanLeft,
+		"pan_right":        &km.PanRight,
+		"kbd_cursor_up":    &km.KbdCursorUp,
+		"kbd_cursor_down":  &km.KbdCursorDown,
+		"kbd_cursor_left":  &km.KbdCursorLeft,
+		"kbd_cursor_right": &km.KbdCursorRight,
+		"kbd_activate":     &km.KbdActivate,
+		"zoom_in":          &km.ZoomIn,
+		"zoom_out":         &km.ZoomOut,
+		"quit":             &km.Quit,
+		"help":             &km.Help,
 	}
 	for name, keys := range overrides {
 		b, ok := fields[name]
