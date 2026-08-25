@@ -137,8 +137,21 @@ func isFillBounded(edits []*Edit, p Point) bool {
 	}
 	col := int(((p.X - ox) * fillProbeZoom) / SubpixW)
 	row := int(((p.Y - oy) * fillProbeZoom) / SubpixH)
-	_, touchesEdge := probe.floodRegion(col, row)
-	return !touchesEdge
+	cells, touchesEdge := probe.floodRegion(col, row)
+	// len(cells) == 0 means the seed's own probe cell already reads as
+	// ink, so floodRegion never even started — that's not necessarily
+	// because the seed is genuinely on a line: the probe is deliberately
+	// coarse (one cell covers a wide swath of world space, for
+	// performance), so a seed a few world units outside a thin wall can
+	// land in the very same cell as that wall's dot and read as solid.
+	// Reading that as "bounded" was the actual bug: it let a click just
+	// outside an object's edge — the extremely common case of zooming in
+	// close to something and clicking just past its border — create a
+	// fill that, rendered at real resolution where the seed truly is
+	// empty, had nothing stopping it and flooded the whole open
+	// background. Treat "the probe couldn't even start" as unknown, not
+	// as safe.
+	return !touchesEdge && len(cells) > 0
 }
 
 type gridCoord struct{ col, row int }
