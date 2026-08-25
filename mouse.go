@@ -4,7 +4,6 @@ import (
 	"math"
 
 	tea "charm.land/bubbletea/v2"
-	zone "github.com/lrstanley/bubblezone/v2"
 )
 
 // eraserRadius returns how close (in world subpixels) the eraser must pass
@@ -187,7 +186,7 @@ func (m *Model) handlePan(msg tea.MouseMsg, col, row int) (tea.Model, tea.Cmd) {
 // its track, so — unlike a real GUI slider's grab handle — you can click
 // or drag anywhere along the bar, not just exactly on the dot.
 func (m *Model) sliderSeek(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	zi := zone.Get(zoneSlider)
+	zi := m.zm.Get(zoneSlider)
 	if zi == nil {
 		return *m, nil
 	}
@@ -206,7 +205,7 @@ func (m *Model) sliderSeek(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 // zoneAt returns the bubblezone ID under the mouse event, if any.
 func (m Model) zoneAt(msg tea.MouseMsg) string {
 	for _, id := range m.zoneIDs() {
-		if z := zone.Get(id); z != nil && z.InBounds(msg) {
+		if z := m.zm.Get(id); z != nil && z.InBounds(msg) {
 			return id
 		}
 	}

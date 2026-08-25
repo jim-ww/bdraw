@@ -7,6 +7,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
+	zone "github.com/lrstanley/bubblezone/v2"
 )
 
 // Tool is which drawing tool is currently active.
@@ -222,6 +223,19 @@ type Model struct {
 	// canvasCache, so writes through it persist. See viewCanvas.
 	cache *canvasCache
 
+	// zm is this Model's own bubblezone manager, not the package-level
+	// global one — every collab peer (host and every SSH guest) runs its
+	// own separate tea.Program concurrently in the same process, and
+	// they'd all be mutating the exact same global zone registry if they
+	// shared it: one peer's render (different terminal size, different
+	// tab layout) would clobber another's zone bounding boxes between
+	// scans, so clicks — tabs most visibly, since their layout differs
+	// most between peers, but really anything — could resolve against
+	// stale or another peer's geometry. A private Manager per Model
+	// (zone.New(), not zone.NewGlobal()) makes each peer's zone state
+	// fully independent.
+	zm *zone.Manager
+
 	// hub is non-nil for every peer in an SSH collaboration session,
 	// host included (see collab.go and main.go): m.tabs then mirrors the
 	// Hub's shared tab list rather than a private one, m.peerID/peerName/
@@ -384,6 +398,7 @@ func NewModel(configPath string) Model {
 		size:     1,
 		input:    ti,
 		cache:    &canvasCache{},
+		zm:       zone.New(),
 		showGrid: true,
 		recent:   loadRecentFiles(),
 		status:   status,

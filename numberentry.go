@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	zone "github.com/lrstanley/bubblezone/v2"
 )
 
 // Shared click-to-type-a-number component, used by both the size and zoom
@@ -178,7 +177,7 @@ func (m Model) viewNumberSlider() string {
 	}
 	bar.WriteByte(']')
 
-	body := label + " " + zone.Mark(zoneSlider, bar.String()) + "\n" +
+	body := label + " " + m.zm.Mark(zoneSlider, bar.String()) + "\n" +
 		dimStyle.Render("click or ←/→ to adjust, type digits, enter to confirm, esc to cancel")
 	return modalStyle.Render(body)
 }

@@ -4,14 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
-
-	zone "github.com/lrstanley/bubblezone/v2"
 )
-
-func TestMain(m *testing.M) {
-	zone.NewGlobal()
-	m.Run()
-}
 
 // makeStrokes builds n strokes of pointsPerStroke points each, scattered
 // across a viewport-sized area, mimicking what fast freehand drawing

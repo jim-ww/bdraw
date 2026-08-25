@@ -7,7 +7,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	zone "github.com/lrstanley/bubblezone/v2"
 )
 
 const selectColor = "#ffaa00"
@@ -53,7 +52,7 @@ func (m Model) View() tea.View {
 	b.WriteString("\n")
 	b.WriteString(m.viewStatus())
 
-	v := tea.NewView(zone.Scan(b.String()))
+	v := tea.NewView(m.zm.Scan(b.String()))
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeAllMotion
 	return v
@@ -118,10 +117,10 @@ func (m Model) tabLines() []string {
 	for i, d := range m.tabs {
 		style := m.styleFor(zoneTab(i), i == m.active)
 		closeStyle := m.styleFor(zoneTabClose(i), false)
-		label := style.Render(d.Title()) + " " + zone.Mark(zoneTabClose(i), closeStyle.Render("x"))
-		parts = append(parts, zone.Mark(zoneTab(i), label))
+		label := style.Render(d.Title()) + " " + m.zm.Mark(zoneTabClose(i), closeStyle.Render("x"))
+		parts = append(parts, m.zm.Mark(zoneTab(i), label))
 	}
-	parts = append(parts, zone.Mark(zoneNewTab, m.styleFor(zoneNewTab, false).Render("+")))
+	parts = append(parts, m.zm.Mark(zoneNewTab, m.styleFor(zoneNewTab, false).Render("+")))
 	return wrapButtons(parts, m.width)
 }
 
@@ -140,7 +139,7 @@ func (m Model) styleFor(id string, active bool) lipgloss.Style {
 }
 
 func (m Model) button(id, label string, active bool) string {
-	return zone.Mark(id, m.styleFor(id, active).Render(label))
+	return m.zm.Mark(id, m.styleFor(id, active).Render(label))
 }
 
 // toolButton renders a tool's toolbar button as its icon glyph when icons
@@ -167,7 +166,7 @@ func (m Model) colorButton() string {
 	if !active && m.hoverZone == zoneColorButton {
 		swatch = swatch.Background(lipgloss.Color("#444444"))
 	}
-	return zone.Mark(zoneColorButton, text.Render(" ")+swatch.Render("●")+text.Render(" Color "))
+	return m.zm.Mark(zoneColorButton, text.Render(" ")+swatch.Render("●")+text.Render(" Color "))
 }
 
 // compactToolbarLine renders the minimal toolbar: current tool, filled
@@ -241,7 +240,7 @@ func (m Model) viewColorPicker() string {
 		if c == m.color {
 			label = "[]"
 		}
-		swatches.WriteString(zone.Mark(zoneColor(i), style.Render(label)))
+		swatches.WriteString(m.zm.Mark(zoneColor(i), style.Render(label)))
 		swatches.WriteString(" ")
 	}
 	hint := dimStyle.Render(" (tab to switch swatches, enter to apply hex, esc to cancel)")

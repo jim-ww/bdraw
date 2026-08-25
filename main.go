@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 
 	tea "charm.land/bubbletea/v2"
-	zone "github.com/lrstanley/bubblezone/v2"
 )
 
 func usage() {
@@ -44,8 +43,6 @@ func main() {
 	collabReadOnly := flag.Bool("collab-readonly", false, "guests get read-only access; only the local session can edit")
 	flag.Usage = usage
 	flag.Parse()
-
-	zone.NewGlobal()
 
 	m := NewModel(*configPath)
 	if path := flag.Arg(0); path != "" {
