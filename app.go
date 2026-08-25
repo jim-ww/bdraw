@@ -390,7 +390,7 @@ func NewModel(configPath string) Model {
 
 	status := "mouse to draw · b/r/c/l/a/e/s/t/m tools · scroll/[/] zoom · arrows/middle-drag pan · ctrl+q quit"
 	if leftover := findAutosaveFiles(); len(leftover) > 0 {
-		status = fmt.Sprintf("found %d autosave file(s) from a previous session in the autosave folder — open to recover", len(leftover))
+		status = fmt.Sprintf("found %d autosave file(s) from a previous session — restart with -restore to resume the most recent one", len(leftover))
 	}
 
 	ti := textinput.New()

@@ -105,3 +105,22 @@ func findAutosaveFiles() []string {
 	}
 	return files
 }
+
+// latestAutosaveFile returns the most recently modified autosave
+// recovery file, or "" if there are none — used by the -restore flag to
+// pick up the most recent crashed/killed session automatically, rather
+// than making the user go hunt through the autosave directory by hand.
+func latestAutosaveFile() string {
+	var newest string
+	var newestMod time.Time
+	for _, f := range findAutosaveFiles() {
+		info, err := os.Stat(f)
+		if err != nil {
+			continue
+		}
+		if newest == "" || info.ModTime().After(newestMod) {
+			newest, newestMod = f, info.ModTime()
+		}
+	}
+	return newest
+}

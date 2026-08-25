@@ -356,6 +356,32 @@ func (m *Model) openInitialFile(path string) {
 	m.rememberFile(path)
 }
 
+// restoreFromAutosave loads path — an autosave recovery file, not a
+// regular saved project — as the starting document. Used by the
+// -restore flag to pick up exactly where a crashed/killed session left
+// off, without having to go find the recovery file by hand.
+//
+// Unlike openInitialFile, the resulting document keeps no Path (it's
+// still Untitled until explicitly saved somewhere real) and is marked
+// Dirty, since its only copy is the recovery file so far. It keeps
+// writing to that same recovery file — reusing its autosaveID rather
+// than generating a fresh one — so autosave continues seamlessly right
+// where it left off, and a subsequent real Save cleans it up exactly
+// like any other autosave file once its content is safely elsewhere.
+func (m *Model) restoreFromAutosave(path string) error {
+	d, err := LoadDocument(path)
+	if err != nil {
+		return err
+	}
+	d.Path = ""
+	d.Dirty = true
+	d.autosaveID = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	m.tabs[0] = d
+	m.active = 0
+	m.status = "restored unsaved work from " + filepath.Base(path)
+	return nil
+}
+
 func (m *Model) openFrom(path string) {
 	d, err := LoadDocument(path)
 	if err != nil {

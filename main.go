@@ -19,6 +19,9 @@ Usage:
 
 Flags:
   -c configfile      path to config.json (default: ~/.config/bdraw/config.json)
+  -restore           resume from the most recent autosave recovery file
+                      (see the autosave folder under the data dir) instead
+                      of a blank canvas or a given file
   -collab            start an SSH collaboration server instead of the local UI
   -collab-addr addr  address to listen on (default: :2222)
   -collab-readonly   guests may view and follow along but not edit; only the
@@ -38,6 +41,7 @@ Press ? inside bdraw for the full keybind reference.`)
 
 func main() {
 	configPath := flag.String("c", "", "path to config.json")
+	restore := flag.Bool("restore", false, "resume from the most recent autosave recovery file")
 	collab := flag.Bool("collab", false, "start an SSH collaboration server")
 	collabAddr := flag.String("collab-addr", ":2222", "address for the collaboration server to listen on")
 	collabReadOnly := flag.Bool("collab-readonly", false, "guests get read-only access; only the local session can edit")
@@ -45,8 +49,16 @@ func main() {
 	flag.Parse()
 
 	m := NewModel(*configPath)
-	if path := flag.Arg(0); path != "" {
-		m.openInitialFile(path)
+	switch {
+	case *restore:
+		path := latestAutosaveFile()
+		if path == "" {
+			fmt.Fprintln(os.Stderr, "bdraw: -restore: no autosave recovery file found")
+		} else if err := m.restoreFromAutosave(path); err != nil {
+			fmt.Fprintln(os.Stderr, "bdraw: -restore:", err)
+		}
+	case flag.Arg(0) != "":
+		m.openInitialFile(flag.Arg(0))
 	}
 
 	if !*collab {
