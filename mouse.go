@@ -106,12 +106,32 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleWheel zooms in/out centered on the cursor's world position (if the
-// wheel event landed on the canvas) so the point under the mouse stays put
-// instead of the view re-centering somewhere else.
+// handleWheel scrolls the size or zoom value up/down when the wheel event
+// lands on that toolbar control, or otherwise zooms the canvas in/out
+// centered on the cursor's world position so the point under the mouse
+// stays put instead of the view re-centering somewhere else.
 func (m *Model) handleWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
+	up := msg.Mouse().Button == tea.MouseWheelUp
+
+	switch m.zoneAt(msg) {
+	case zoneSizeValue:
+		if up {
+			m.sizeInc()
+		} else {
+			m.sizeDec()
+		}
+		return *m, nil
+	case zoneZoomValue:
+		if up {
+			m.zoomAtCursor(zoomStep)
+		} else {
+			m.zoomAtCursor(1 / zoomStep)
+		}
+		return *m, nil
+	}
+
 	factor := zoomStep
-	if msg.Mouse().Button == tea.MouseWheelDown {
+	if !up {
 		factor = 1 / zoomStep
 	}
 	if col, row, ok := m.canvasCell(msg); ok {

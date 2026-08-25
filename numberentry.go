@@ -19,7 +19,7 @@ import (
 func (m *Model) startNumberEntry(target string, current float64) {
 	m.mode = modeNumberEntry
 	m.numEntryTarget = target
-	m.numEntryValue = strconv.FormatFloat(current, 'f', -1, 64)
+	m.numEntryValue = strconv.FormatFloat(current, 'f', 1, 64)
 }
 
 // numberEntryRange returns the valid range and display label for the
@@ -53,9 +53,12 @@ func (m *Model) applyNumberEntryValue(v float64) {
 		applied = m.doc().Zoom * 100
 	}
 	// Reflect what actually got applied (setSize/zoomAtCursor round and
-	// clamp), not the raw slider/arrow-key math, so the live label never
-	// shows more precision than the value it's tracking actually has.
-	m.numEntryValue = strconv.FormatFloat(applied, 'f', -1, 64)
+	// clamp), not the raw slider/arrow-key math — and format to a fixed 1
+	// decimal rather than shortest-exact ('f', -1, ...): re-deriving the
+	// zoom percentage as Zoom*100 reintroduces binary floating-point noise
+	// even when Zoom itself was cleanly rounded, so shortest-exact would
+	// still print things like 300.09999999999997.
+	m.numEntryValue = strconv.FormatFloat(applied, 'f', 1, 64)
 }
 
 func (m Model) handleNumberEntryKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
