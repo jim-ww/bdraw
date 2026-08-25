@@ -150,10 +150,14 @@ func (r *Raster) floodFill(e *Edit, ox, oy, zoom float64, color string) {
 	p := e.Points[0]
 	col := int(((p.X - ox) * zoom) / SubpixW)
 	row := int(((p.Y - oy) * zoom) / SubpixH)
-	cells, touchesEdge := r.floodRegion(col, row)
-	if touchesEdge {
-		return
-	}
+	// touchesEdge is deliberately ignored here: it's only meaningful at
+	// creation time (see mouse.go), where it's checked against the
+	// viewport the user actually clicked in. At render time, "the flood
+	// reaches the current viewport's edge" is completely expected and
+	// correct once you've zoomed in past the shape's boundary — the
+	// enclosing ink is simply off-screen, not gone. Aborting the paint
+	// here made a valid fill vanish the moment you zoomed in far enough.
+	cells, _ := r.floodRegion(col, row)
 	for _, c := range cells {
 		r.at(c.col, c.row).bg = color
 	}
