@@ -17,6 +17,11 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// A read-only collab guest can look but not touch the shared document.
+	if m.readOnly && isMutatingKey(m.km, msg) {
+		return m, nil
+	}
+
 	switch {
 	case key.Matches(msg, m.km.Quit):
 		return m, tea.Quit
@@ -129,5 +134,15 @@ func isToolSwitchKey(km KeyMap, msg tea.KeyMsg) bool {
 	return key.Matches(msg,
 		km.ToolBrush, km.ToolRect, km.ToolCircle, km.ToolLine, km.ToolEraser,
 		km.ToolSelect, km.ToolText, km.ToolMove, km.ToolFill, km.ToolArrow, km.ToolEyedropper,
+	)
+}
+
+// isMutatingKey reports whether msg matches a binding that edits the
+// document (or otherwise acts on it in a way a read-only collab guest
+// shouldn't be able to trigger).
+func isMutatingKey(km KeyMap, msg tea.KeyMsg) bool {
+	return key.Matches(msg,
+		km.Undo, km.Redo, km.Delete, km.Paste, km.New, km.Clear,
+		km.Save, km.SaveAs, km.Open,
 	)
 }

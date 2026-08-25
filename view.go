@@ -424,6 +424,37 @@ func (m Model) viewCanvas() string {
 	r := m.canvasRaster(cols, rows, d, zoom)
 	mx0, my0, mx1, my1, marquee := m.marqueeBounds(d.Offset, zoom)
 
+	// Other collab peers' cursors, converted from their broadcast world
+	// coordinates into this viewer's own screen cells — necessary since
+	// each connection can independently pan/zoom.
+	type peerDot struct {
+		ru    rune
+		color string
+	}
+	peerAt := map[[2]int]peerDot{}
+	for _, pc := range m.peerCursors {
+		if !pc.Visible {
+			continue
+		}
+		col := int((pc.Pt.X - d.Offset.X) * zoom / SubpixW)
+		row := int((pc.Pt.Y - d.Offset.Y) * zoom / SubpixH)
+		if col < 0 || col >= cols || row < 0 || row >= rows {
+			continue
+		}
+		peerAt[[2]int{col, row}] = peerDot{ru: '●', color: pc.Color}
+		label := " " + pc.Name
+		for i, r := range label {
+			lc := col + 1 + i
+			if lc >= cols {
+				break
+			}
+			if _, taken := peerAt[[2]int{lc, row}]; taken {
+				break
+			}
+			peerAt[[2]int{lc, row}] = peerDot{ru: r, color: pc.Color}
+		}
+	}
+
 	type styleKey struct{ fg, bg string }
 	styles := map[styleKey]lipgloss.Style{}
 	styleFor := func(k styleKey) lipgloss.Style {
@@ -462,10 +493,13 @@ func (m Model) viewCanvas() string {
 		for col := 0; col < cols; col++ {
 			ru, color := r.Rune(col, row)
 			bg := r.Background(col, row)
+			pd, isPeer := peerAt[[2]int{col, row}]
 
 			switch {
 			case m.cursorVisible && m.mode == modeNormal && col == m.cursorCol && row == m.cursorRow:
 				ru, color = toolCursor[m.tool], m.cursorColor()
+			case isPeer:
+				ru, color = pd.ru, pd.color
 			case marquee && (col == mx0 || col == mx1) && row >= my0 && row <= my1,
 				marquee && (row == my0 || row == my1) && col >= mx0 && col <= mx1:
 				if ru == ' ' {

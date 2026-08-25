@@ -221,6 +221,27 @@ type Model struct {
 	// copied along with everything else, but it keeps pointing at the same
 	// canvasCache, so writes through it persist. See viewCanvas.
 	cache *canvasCache
+
+	// hub is non-nil only for an SSH collaboration session (see
+	// collab.go): m.tabs[0] then points at the Hub's shared *Document
+	// rather than a private one, m.peerID/peerName/peerColor identify
+	// this connection to everyone else, and every mouse/key event routes
+	// through collabWrap to serialize edits and broadcast cursor moves.
+	hub       *Hub
+	peerID    int
+	peerName  string
+	peerColor string
+
+	// readOnly disables every action that mutates the document — set for
+	// guests on a collab server started with the read-only flag. The host
+	// itself never goes through this (its Model has no hub at all; it
+	// runs the ordinary local UI while the Hub's doc is what's shared).
+	readOnly bool
+
+	// peerCursors holds every other connected peer's last-broadcast
+	// cursor position, keyed by peer ID, so it can be drawn as a small
+	// dot with their name regardless of this viewer's own pan/zoom.
+	peerCursors map[int]peerCursor
 }
 
 // canvasCache holds the last rasterized canvas frame plus the exact view
@@ -319,34 +340,55 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.MouseMsg:
-		return m.handleMouse(msg)
+		return m.collabWrap(func(mm Model) (tea.Model, tea.Cmd) { return mm.handleMouse(msg) })
+
+	case collabCursorMsg:
+		if m.peerCursors == nil {
+			m.peerCursors = map[int]peerCursor{}
+		}
+		m.peerCursors[msg.ID] = peerCursor{Name: msg.Name, Color: msg.Color, Pt: msg.Pt, Visible: msg.Visible}
+		return m, nil
+
+	case collabByeMsg:
+		delete(m.peerCursors, msg.ID)
+		return m, nil
+
+	case collabRefreshMsg:
+		return m, nil
 
 	case autosaveMsg:
 		m.runAutosave()
 		return m, autosaveTick()
 
 	case tea.KeyMsg:
-		if m.showHelp {
-			switch msg.String() {
-			case "?", "esc":
-				m.showHelp = false
-			}
-			return m, nil
-		}
-		if key.Matches(msg, m.km.Help) {
-			m.showHelp = true
-			return m, nil
-		}
-		if m.mode == modeColorPicker {
-			return m.handleColorPickerKey(msg)
-		}
-		if m.mode == modeNumberEntry {
-			return m.handleNumberEntryKey(msg)
-		}
-		if m.mode != modeNormal {
-			return m.handlePromptKey(msg)
-		}
-		return m.handleKey(msg)
+		return m.collabWrap(func(mm Model) (tea.Model, tea.Cmd) { return mm.handleKeyMsg(msg) })
 	}
 	return m, nil
+}
+
+// handleKeyMsg is the body of the old tea.KeyMsg case, split out so
+// collabWrap can serialize it (under the Hub's lock, for a collab
+// session) the same way it serializes mouse events.
+func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.showHelp {
+		switch msg.String() {
+		case "?", "esc":
+			m.showHelp = false
+		}
+		return m, nil
+	}
+	if key.Matches(msg, m.km.Help) {
+		m.showHelp = true
+		return m, nil
+	}
+	if m.mode == modeColorPicker {
+		return m.handleColorPickerKey(msg)
+	}
+	if m.mode == modeNumberEntry {
+		return m.handleNumberEntryKey(msg)
+	}
+	if m.mode != modeNormal {
+		return m.handlePromptKey(msg)
+	}
+	return m.handleKey(msg)
 }

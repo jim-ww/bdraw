@@ -216,6 +216,11 @@ func (m Model) zoneAt(msg tea.MouseMsg) string {
 }
 
 func (m *Model) toolDown(pt Point) (tea.Model, tea.Cmd) {
+	// A read-only collab guest can look around (pan/zoom/select) but never
+	// starts a drag that would mutate the shared document.
+	if m.readOnly && m.tool != ToolSelect {
+		return m, nil
+	}
 	d := m.doc()
 	switch m.tool {
 	case ToolBrush:
