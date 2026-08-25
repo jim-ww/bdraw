@@ -62,17 +62,19 @@ func (m Model) edgePanDelta() (dx, dy float64, ok bool) {
 	return dx, dy, dx != 0 || dy != 0
 }
 
-// handleEdgePan is called from Update on every edgePanMsg tick. While a
-// drag is in progress and the cursor is sitting at the viewport's edge,
-// it pans the view and re-drives the in-progress drag with the world
-// point now under the (screen-stationary) cursor — exactly what a real
-// mouse-motion event would do, except the physical mouse hasn't actually
-// moved, so no such event exists on its own. Without this, panning alone
-// would just slide the canvas out from under a drag that never actually
-// extends past whatever was visible when the cursor first reached the
-// edge, defeating the entire point of edge-panning.
+// handleEdgePan is called from Update on every edgePanMsg tick. Whenever
+// the cursor is sitting at the viewport's edge — hovering is enough, no
+// button needs to be held — it pans the view, the same way an RTS
+// camera scrolls when the mouse rests at the screen edge. If a drag also
+// happens to be in progress, it additionally re-drives that drag with
+// the world point now under the (screen-stationary) cursor — exactly
+// what a real mouse-motion event would do, except the physical mouse
+// hasn't actually moved, so no such event exists on its own. Without
+// that second part, panning while dragging would just slide the canvas
+// out from under a stroke/selection that never actually extends past
+// whatever was visible when the cursor first reached the edge.
 func (m Model) handleEdgePan() (tea.Model, tea.Cmd) {
-	if m.cfg.DisableEdgePan || !m.dragging {
+	if m.cfg.DisableEdgePan {
 		return m, edgePanTick()
 	}
 	dx, dy, ok := m.edgePanDelta()
@@ -83,6 +85,10 @@ func (m Model) handleEdgePan() (tea.Model, tea.Cmd) {
 	offset.X += dx
 	offset.Y += dy
 	m.setViewOffset(offset)
+
+	if !m.dragging {
+		return m, edgePanTick()
+	}
 
 	newModel, cmd := m.collabWrap(func(mm Model) (tea.Model, tea.Cmd) {
 		return mm.toolDrag(mm.cellToPoint(mm.cursorCol, mm.cursorRow), mm.dragConstrain)

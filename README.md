@@ -6,7 +6,6 @@ A mouse-first paint program for the terminal, built on [Bubble Tea](https://char
 
 - Full tool set: brush, rectangle, circle, line, arrow, eraser, fill, text, select/move, eyedropper
 - Undo/redo, copy/paste, snap-to-grid, ctrl-drag to constrain lines/arrows to 45° or rect/circle to a square/perfect circle
-- Auto-pans the canvas when a drag reaches the viewport edge (toggle with `disable_edge_pan` in config)
 - Tabs, recent-files list, crash recovery (autosave + `-restore` to resume the latest one)
 - Save/load as JSON project files, export to PNG or SVG
 - Optional SSH collaboration mode: `-collab` turns a running session into a multi-user room — everyone sees each other's cursor, tabs and edits sync live, and a `-collab-readonly` flag can restrict everyone but the host to viewing

@@ -58,6 +58,29 @@ func TestEdgePanExtendsDragAcrossPan(t *testing.T) {
 	}
 }
 
+// TestEdgePanHoverAloneTriggers checks edge-pan fires from the cursor
+// merely resting at the viewport edge, with no button held and no drag
+// in progress — like an RTS camera, not gated on an active drag.
+func TestEdgePanHoverAloneTriggers(t *testing.T) {
+	m := NewModel("")
+	m.width, m.height = 40, 20
+	m.cursorVisible = true
+	if m.dragging {
+		t.Fatal("test setup: expected no drag in progress")
+	}
+
+	cols, _ := m.canvasSize()
+	m.cursorCol, m.cursorRow = cols - 1, 5
+	before := m.viewOffset()
+
+	newModel, _ := m.handleEdgePan()
+	m = newModel.(Model)
+
+	if m.viewOffset() == before {
+		t.Fatal("expected hovering at the edge alone (no drag, no button held) to pan the view")
+	}
+}
+
 // TestEdgePanDisabledByConfig checks the DisableEdgePan config flag is
 // actually honored.
 func TestEdgePanDisabledByConfig(t *testing.T) {
