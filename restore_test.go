@@ -11,6 +11,12 @@ import (
 // it as an unsaved (no Path, Dirty) document that keeps writing to the
 // same recovery file rather than starting a fresh one.
 func TestRestoreFromAutosaveFlow(t *testing.T) {
+	// Sandbox into a throwaway directory rather than the real XDG data
+	// dir: a build sandbox (e.g. Nix's checkPhase) typically runs with
+	// $HOME unset/unwritable, and even outside one, a test has no
+	// business touching the user's actual autosave folder.
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+
 	dir, err := autosaveDir()
 	if err != nil {
 		t.Fatal(err)
@@ -59,14 +65,7 @@ func TestRestoreFromAutosaveFlow(t *testing.T) {
 // TestRestoreFromAutosaveNoFiles checks latestAutosaveFile degrades to ""
 // rather than erroring when there's nothing to restore.
 func TestRestoreFromAutosaveNoFiles(t *testing.T) {
-	dir, err := autosaveDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-	entries, _ := os.ReadDir(dir)
-	if len(entries) != 0 {
-		t.Skip("autosave dir is non-empty from another test/session; skipping to avoid a false failure")
-	}
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	if got := latestAutosaveFile(); got != "" {
 		t.Fatalf("expected no autosave file, got %q", got)
 	}

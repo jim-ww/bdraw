@@ -22,7 +22,7 @@
           meta = with pkgs.lib; {
             description = "A mouse-first paint program for the terminal";
             homepage = "https://github.com/jim-ww/bdraw";
-            license = licenses.mit;
+            license = licenses.gpl3Only;
             mainProgram = "bdraw";
           };
         };
