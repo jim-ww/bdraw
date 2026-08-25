@@ -1,3 +1,4 @@
 /bdraw
 *.test
 test.json
+result/
