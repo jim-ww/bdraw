@@ -212,15 +212,7 @@ func (m *Model) toolDown(pt Point) (tea.Model, tea.Cmd) {
 		}
 
 	case ToolFill:
-		cols, rows := m.canvasSize()
-		zoom := d.Zoom
-		if zoom == 0 {
-			zoom = 1
-		}
-		check := RasterizeDocument(d.Edits, cols, rows, d.Offset.X, d.Offset.Y, zoom, selectColor, 0, "")
-		col := int(((pt.X - d.Offset.X) * zoom) / SubpixW)
-		row := int(((pt.Y - d.Offset.Y) * zoom) / SubpixH)
-		if _, touchesEdge := check.floodRegion(col, row); touchesEdge {
+		if !isFillBounded(d.Edits, pt) {
 			m.status = "fill needs an enclosed area"
 			return *m, nil
 		}

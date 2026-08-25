@@ -83,17 +83,53 @@ func RasterizeDocument(edits []*Edit, cols, rows int, ox, oy, zoom float64, sele
 		}
 	}
 	var fills []*Edit
+	var nonFills []*Edit
 	for _, e := range edits {
 		if e.Kind == KindFill {
 			fills = append(fills, e)
 			continue
 		}
+		nonFills = append(nonFills, e)
 		r.drawEdit(e, ox, oy, zoom, pick(e))
 	}
 	for _, e := range fills {
-		r.floodFill(e, ox, oy, zoom, pick(e))
+		// Re-validate boundedness on every render, not just at creation:
+		// the enclosing shape can be edited or deleted after the fill
+		// exists. This has to be independent of the current viewport (see
+		// isFillBounded) — checking against the visible raster itself is
+		// exactly the bug that made a valid fill disappear on zoom.
+		if len(e.Points) > 0 && isFillBounded(nonFills, e.Points[0]) {
+			r.floodFill(e, ox, oy, zoom, pick(e))
+		}
 	}
 	return r
+}
+
+// fillProbeRadius/fillProbeCols/fillProbeRows/fillProbeZoom define a fixed,
+// viewport-independent window (a 4096x4096 world-subpixel square around the
+// fill's seed point, at coarse resolution) used purely to answer "is this
+// fill still enclosed by ink" — independent of whatever the user currently
+// has panned/zoomed to. A shape larger than this window in every direction
+// is vanishingly unlikely for a terminal painting.
+const (
+	fillProbeRadius = 2048.0
+	fillProbeCols   = 256
+	fillProbeRows   = 128
+	fillProbeZoom   = 0.125
+)
+
+// isFillBounded reports whether a flood fill seeded at p is enclosed by ink
+// from edits, regardless of the current viewport.
+func isFillBounded(edits []*Edit, p Point) bool {
+	ox, oy := p.X-fillProbeRadius, p.Y-fillProbeRadius
+	probe := &Raster{Cols: fillProbeCols, Rows: fillProbeRows, cells: make([]cell, fillProbeCols*fillProbeRows)}
+	for _, e := range edits {
+		probe.drawEdit(e, ox, oy, fillProbeZoom, e.Color)
+	}
+	col := int(((p.X - ox) * fillProbeZoom) / SubpixW)
+	row := int(((p.Y - oy) * fillProbeZoom) / SubpixH)
+	_, touchesEdge := probe.floodRegion(col, row)
+	return !touchesEdge
 }
 
 type gridCoord struct{ col, row int }
