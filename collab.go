@@ -325,10 +325,22 @@ func serveCollabSession(sess ssh.Session, hub *Hub, cfg Config) {
 	m.peerName = name
 	m.peerColor = color
 
+	// Without this, bubbletea's color-profile/capability detection reads
+	// the *server* process's own environment (TERM, COLORTERM, ...) —
+	// not the connecting client's — since sess's I/O is an SSH channel,
+	// not a real local pty the usual isatty/env probing was written
+	// for. That's what caused missing colors and rendering artifacts
+	// over SSH even though both ends run a perfectly capable terminal
+	// (foot) locally: the server likely wasn't launched from an
+	// interactive foot session itself (TERM=dumb or unset), so every
+	// guest inherited that. Forwarding the client's own TERM (from the
+	// pty-req it sent) plus its other env vars fixes detection for each
+	// session independently.
 	opts := []tea.ProgramOption{
 		tea.WithInput(sess),
 		tea.WithOutput(sess),
 		tea.WithContext(ctx),
+		tea.WithEnvironment(append(sess.Environ(), "TERM="+pty.Term)),
 	}
 	p := tea.NewProgram(m, opts...)
 	pRef.Store(p)
