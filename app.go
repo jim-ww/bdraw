@@ -248,6 +248,19 @@ type canvasCache struct {
 	// the already-cached raster.
 	dragEditID      int
 	dragPointsBaked int
+
+	// baseRaster/baseEditID/baseVer support the analogous fast path for
+	// dragging out a rect/circle/line/arrow: that edit always has exactly
+	// 2 points (just its far corner moving), so there's nothing to append
+	// incrementally — but every other edit in the document is completely
+	// unaffected by the drag, so there's no need to redraw them on every
+	// motion event either. baseRaster is everything except the actively
+	// dragged edit, computed once and reused for the rest of the drag;
+	// each frame just composites the shape's current geometry on top of a
+	// copy of it.
+	baseRaster *Raster
+	baseEditID int
+	baseVer    int
 }
 
 // NewModel builds the initial application state. configPath overrides

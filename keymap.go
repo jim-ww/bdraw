@@ -81,7 +81,7 @@ func DefaultKeyMap() KeyMap {
 	return KeyMap{
 		ToolBrush:      bind([]string{"b"}, "brush"),
 		ToolRect:       bind([]string{"r"}, "rectangle"),
-		ToolCircle:     bind([]string{"o", "c"}, "oval"),
+		ToolCircle:     bind([]string{"c"}, "circle"),
 		ToolLine:       bind([]string{"l"}, "line"),
 		ToolEraser:     bind([]string{"e"}, "eraser"),
 		ToolSelect:     bind([]string{"s"}, "select"),
@@ -89,7 +89,7 @@ func DefaultKeyMap() KeyMap {
 		ToolMove:       bind([]string{"m"}, "move"),
 		ToolFill:       bind([]string{"f"}, "fill"),
 		ToolArrow:      bind([]string{"a"}, "arrow"),
-		ToolEyedropper: bind([]string{"q"}, "eyedropper"),
+		ToolEyedropper: bind([]string{"i"}, "eyedropper"),
 
 		Undo:           bind([]string{"ctrl+z"}, "undo"),
 		Redo:           bind([]string{"ctrl+shift+z", "ctrl+y"}, "redo"),
@@ -145,7 +145,7 @@ func DefaultKeyMap() KeyMap {
 		// ctrl+q, not ctrl+c: ctrl+c is Copy now, and is also the universal
 		// "just kill it" muscle-memory key, so overloading it for quit
 		// risked an accidental copy silently eating a real interrupt too.
-		Quit: bind([]string{"ctrl+q"}, "quit"),
+		Quit: bind([]string{"ctrl+q", "q"}, "quit"),
 		Help: bind([]string{"?"}, "toggle help"),
 	}
 }
@@ -175,11 +175,11 @@ func LoadKeyMap() KeyMap {
 }
 
 func keymapConfigPath() (string, error) {
-	dir, err := os.UserConfigDir()
+	dir, err := configDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "bdraw", "keymap.json"), nil
+	return filepath.Join(dir, "keymap.json"), nil
 }
 
 func applyOverrides(km *KeyMap, overrides keyOverrides) {

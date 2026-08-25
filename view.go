@@ -281,16 +281,65 @@ func (m Model) canvasRaster(cols, rows int, d *Document, zoom float64) *Raster {
 		}
 	}
 
+	// Overlay fast path for dragging out a rect/circle/line/arrow: that
+	// edit is always just 2 points (its far corner following the cursor),
+	// so unlike the brush there's nothing to append — but every *other*
+	// edit is untouched by the drag, so they don't need to be redrawn
+	// either. The base (everything else) is cached once per drag and
+	// reused: dragEditID/tool/dragging all still matching what the base
+	// was captured under, plus the active edit still being the document's
+	// last one (i.e. it wasn't undone out from under us), are enough to
+	// trust nothing else changed — there's no natural per-frame delta to
+	// check arithmetically here the way there is for point-appending.
+	if sameView && m.dragging && isShapeDragTool(m.tool) && m.dragEdit != nil &&
+		c.baseRaster != nil && c.baseEditID == m.dragEdit.ID &&
+		len(d.Edits) > 0 && d.Edits[len(d.Edits)-1] == m.dragEdit {
+		r := c.baseRaster.clone()
+		color := m.dragEdit.Color
+		if m.dragEdit.Selected {
+			color = selectColor
+		}
+		r.drawEdit(m.dragEdit, d.Offset.X, d.Offset.Y, zoom, color)
+		c.raster = r
+		c.docVer = d.Version
+		return r
+	}
+
 	r := RasterizeDocument(d.Edits, cols, rows, d.Offset.X, d.Offset.Y, zoom, selectColor, m.hoverEditID, hoverEditColor)
 	dragEditID, dragPointsBaked := 0, 0
+	var baseRaster *Raster
+	baseEditID, baseVer := 0, 0
 	if m.dragging && m.tool == ToolBrush && m.dragEdit != nil {
 		dragEditID, dragPointsBaked = m.dragEdit.ID, len(m.dragEdit.Points)
+	}
+	if m.dragging && isShapeDragTool(m.tool) && m.dragEdit != nil {
+		baseRaster = RasterizeDocument(withoutEdit(d.Edits, m.dragEdit.ID), cols, rows, d.Offset.X, d.Offset.Y, zoom, selectColor, m.hoverEditID, hoverEditColor)
+		baseEditID, baseVer = m.dragEdit.ID, d.Version
 	}
 	*c = canvasCache{
 		raster: r, cols: cols, rows: rows, offset: d.Offset, zoom: zoom, doc: d, docVer: d.Version,
 		highlightID: m.hoverEditID, dragEditID: dragEditID, dragPointsBaked: dragPointsBaked,
+		baseRaster: baseRaster, baseEditID: baseEditID, baseVer: baseVer,
 	}
 	return r
+}
+
+// isShapeDragTool reports whether tool creates a single 2-point edit that
+// just follows the cursor while dragging (as opposed to brush, which grows
+// a point list, or move/select, which touch other edits).
+func isShapeDragTool(t Tool) bool {
+	return t == ToolRect || t == ToolCircle || t == ToolLine || t == ToolArrow
+}
+
+// withoutEdit returns edits minus the one with the given ID.
+func withoutEdit(edits []*Edit, id int) []*Edit {
+	out := make([]*Edit, 0, len(edits))
+	for _, e := range edits {
+		if e.ID != id {
+			out = append(out, e)
+		}
+	}
+	return out
 }
 
 // marqueeBounds returns the select-tool drag rectangle in screen cells,

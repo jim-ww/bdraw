@@ -30,7 +30,7 @@ func (m Model) helpSections() []helpSection {
 		{"Tools", []helpEntry{
 			he(km.ToolBrush, "brush"),
 			he(km.ToolRect, "rectangle"),
-			he(km.ToolCircle, "oval"),
+			he(km.ToolCircle, "circle"),
 			he(km.ToolLine, "line"),
 			he(km.ToolArrow, "arrow"),
 			he(km.ToolEraser, "eraser"),

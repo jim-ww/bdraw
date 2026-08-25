@@ -9,11 +9,11 @@ import (
 const maxRecentFiles = 9
 
 func recentFilesPath() (string, error) {
-	dir, err := os.UserConfigDir()
+	dir, err := dataDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "bdraw", "recent.json"), nil
+	return filepath.Join(dir, "recent.json"), nil
 }
 
 // loadRecentFiles reads the most-recent-first list of previously

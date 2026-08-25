@@ -59,6 +59,15 @@ func (r *Raster) Background(col, row int) string {
 	return r.at(col, row).bg
 }
 
+// clone returns an independent copy, so it can be safely drawn onto
+// without disturbing the original (used to overlay a shape's current
+// geometry on top of a cached base raster of everything else).
+func (r *Raster) clone() *Raster {
+	cells := make([]cell, len(r.cells))
+	copy(cells, r.cells)
+	return &Raster{Cols: r.Cols, Rows: r.Rows, cells: cells}
+}
+
 // RasterizeDocument draws edits into a Cols x Rows grid. (ox, oy) is the
 // world coordinate at the viewport's top-left and zoom is world-to-screen
 // scale (subpixels of screen per subpixel of world).

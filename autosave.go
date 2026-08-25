@@ -21,11 +21,11 @@ func autosaveTick() tea.Cmd {
 }
 
 func autosaveDir() (string, error) {
-	dir, err := os.UserConfigDir()
+	dir, err := dataDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "bdraw", "autosave"), nil
+	return filepath.Join(dir, "autosave"), nil
 }
 
 // newAutosaveID returns a short random identifier used to name a

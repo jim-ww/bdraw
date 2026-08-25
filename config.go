@@ -30,11 +30,11 @@ func DefaultConfig() Config {
 // defaultConfigPath returns ~/.config/bdraw/config.json (or the platform
 // equivalent).
 func defaultConfigPath() (string, error) {
-	dir, err := os.UserConfigDir()
+	dir, err := configDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "bdraw", "config.json"), nil
+	return filepath.Join(dir, "config.json"), nil
 }
 
 // LoadConfig starts from DefaultConfig and applies overrides from a config
