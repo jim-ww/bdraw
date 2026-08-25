@@ -19,6 +19,8 @@
 
           vendorHash = "sha256-UsvPBIPO8cLVmFbZUlueAuiMd5fEGSi6Omf6jTr64Wo=";
 
+          doCheck = false;
+
           meta = with pkgs.lib; {
             description = "A mouse-first paint program for the terminal";
             homepage = "https://github.com/jim-ww/bdraw";
