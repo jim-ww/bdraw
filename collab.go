@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/charmbracelet/ssh"
+	"charm.land/ssh"
 )
 
 // peerCursor is another connected peer's last-known canvas position, kept
@@ -30,12 +30,14 @@ type collabCursorMsg struct {
 	Visible bool
 }
 
-// collabRefreshMsg is broadcast after any peer mutates the shared
-// Document. It carries no data: the mutation already happened directly on
-// the *Document every peer's Model shares a pointer to (under Hub's
-// lock) — this message exists purely to make bubbletea run another
-// Update/View cycle for the recipient, whose next render picks up the new
-// Document.Version and re-rasterizes.
+// collabRefreshMsg is broadcast after any peer mutates shared state — an
+// edit to the active Document, or a tab created/closed/switched. It
+// carries no data: on receipt, the recipient re-reads m.tabs/m.active
+// from the Hub (see app.go's Update) to pick up any tab-list change, and
+// its next render picks up each Document's new Version to re-rasterize.
+// A pure edit to the existing active Document doesn't strictly need the
+// tabs/active resync (that pointer is already shared), but doing it
+// unconditionally keeps this one code path simple.
 type collabRefreshMsg struct{}
 
 // collabByeMsg tells a peer to drop a departed connection's cursor.
@@ -46,16 +48,19 @@ var peerColors = []string{
 	"#87ff87", "#ff87d7", "#5fafff", "#ffaf5f",
 }
 
-// Hub coordinates a single shared Document across multiple SSH-connected
-// peers. Every connection's Model.tabs[0] points at the same *Document;
-// Hub.mu serializes every mouse/key event across all peers so no two
-// connections ever mutate the document concurrently. That's coarser than
-// necessary but simple and safe at collaboration-session scale (a handful
-// of concurrent editors sharing a terminal-speed connection, not a
-// high-throughput service).
+// Hub coordinates a shared set of tabs across multiple SSH-connected
+// peers, including the host's own local session (see runHostAndCollab in
+// main.go — the host is peer 0, just like every guest, so its edits and
+// tab changes broadcast out the same way guests' do). Hub.mu serializes
+// every mouse/key event across all peers so no two connections ever
+// mutate a document, or the tab list itself, concurrently. That's coarser
+// than necessary but simple and safe at collaboration-session scale (a
+// handful of concurrent editors sharing a terminal-speed connection, not
+// a high-throughput service).
 type Hub struct {
 	mu       sync.Mutex
-	doc      *Document
+	tabs     []*Document
+	active   int
 	readOnly bool
 	peers    map[int]*peer
 	nextID   int
@@ -68,11 +73,31 @@ type peer struct {
 	send  func(tea.Msg)
 }
 
-// NewHub creates a Hub around doc. readOnly, if true, means every guest
-// (every peer except the local host, who never goes through the Hub) may
-// view and follow along but not edit.
-func NewHub(doc *Document, readOnly bool) *Hub {
-	return &Hub{doc: doc, readOnly: readOnly, peers: map[int]*peer{}}
+// NewHub creates a Hub around the given tab list. readOnly, if true, means
+// every non-host peer may view and follow along — including switching
+// between tabs — but not edit or create/close tabs.
+func NewHub(tabs []*Document, active int, readOnly bool) *Hub {
+	return &Hub{tabs: tabs, active: active, readOnly: readOnly, peers: map[int]*peer{}}
+}
+
+// snapshot returns a copy of the current tab list and active index, safe
+// to hand to a Model. Must be called with h.mu held or right after Join,
+// before any other peer's mutation can race it.
+func (h *Hub) snapshot() (tabs []*Document, active int) {
+	return h.tabs, h.active
+}
+
+// docsSignature is a cheap fingerprint of every tab's identity and edit
+// version plus which one is active, used by collabWrap to decide whether
+// a peer's turn through Update actually changed shared state worth
+// broadcasting (a new/closed/switched tab, or an edit) versus something
+// purely local (cursor motion, a slider drag with no committed change).
+func docsSignature(tabs []*Document, active int) string {
+	sig := fmt.Sprintf("%d:", active)
+	for _, d := range tabs {
+		sig += fmt.Sprintf("%p=%d,", d, d.Version)
+	}
+	return sig
 }
 
 // Join registers a new peer and returns its ID and assigned cursor color.
@@ -125,21 +150,24 @@ func (h *Hub) MoveCursor(id int, name, color string, pt Point, visible bool) {
 	h.broadcastExcept(id, collabCursorMsg{ID: id, Name: name, Color: color, Pt: pt, Visible: visible})
 }
 
-// collabWrap runs fn — a mouse or key event handler — with the Hub's doc
-// lock held (so it can't race a concurrent edit from another peer), then
-// broadcasts a refresh to everyone else if the document actually changed,
-// plus the peer's current cursor position. When m.hub is nil (no
-// collaboration active) it's just a passthrough.
+// collabWrap runs fn — a mouse or key event handler — with the Hub's lock
+// held (so it can't race a concurrent edit, or tab add/close/switch, from
+// another peer), then broadcasts a refresh to everyone else if shared
+// state actually changed, plus the peer's current cursor position. When
+// m.hub is nil (no collaboration active) it's just a passthrough.
 func (m Model) collabWrap(fn func(Model) (tea.Model, tea.Cmd)) (tea.Model, tea.Cmd) {
 	if m.hub == nil {
 		return fn(m)
 	}
-	before := m.doc().Version
 	m.hub.mu.Lock()
+	m.tabs, m.active = m.hub.snapshot()
+	before := docsSignature(m.tabs, m.active)
 	newModel, cmd := fn(m)
-	m.hub.mu.Unlock()
 	nm := newModel.(Model)
-	if nm.doc().Version != before {
+	nm.hub.tabs, nm.hub.active = nm.tabs, nm.active
+	after := docsSignature(nm.tabs, nm.active)
+	m.hub.mu.Unlock()
+	if after != before {
 		m.hub.broadcastExcept(m.peerID, collabRefreshMsg{})
 	}
 	if nm.cursorVisible {
@@ -149,22 +177,20 @@ func (m Model) collabWrap(fn func(Model) (tea.Model, tea.Cmd)) (tea.Model, tea.C
 }
 
 // runCollabServer starts the SSH collaboration server on addr, serving
-// doc to every connection. readOnly gates whether guests may edit;
-// the server itself has no authentication — "connecting is just
-// ssh-ing into the session", per the design brief — so anyone who can
-// reach addr can join.
+// hub's shared tabs to every connection. hub.readOnly gates whether
+// guests may edit; the server itself has no authentication — "connecting
+// is just ssh-ing into the session", per the design brief — so anyone who
+// can reach addr can join.
 //
 // Peer identity comes from the SSH login name (i.e. `ssh alice@host`),
 // which is the one piece of "who is this" the SSH protocol reliably
 // exposes without inventing a separate handshake.
-func runCollabServer(addr string, doc *Document, readOnly bool, cfg Config) error {
-	hub := NewHub(doc, readOnly)
-
+func runCollabServer(addr string, hub *Hub, cfg Config) error {
 	s := &ssh.Server{
 		Addr:    addr,
 		Handler: func(sess ssh.Session) { serveCollabSession(sess, hub, cfg) },
 	}
-	log.Printf("bdraw collab server listening on %s (read-only guests: %v)", addr, readOnly)
+	log.Printf("bdraw collab server listening on %s (read-only guests: %v)", addr, hub.readOnly)
 	return s.ListenAndServe()
 }
 
@@ -192,8 +218,9 @@ func serveCollabSession(sess ssh.Session, hub *Hub, cfg Config) {
 	m := NewModel("")
 	m.cfg = cfg
 	applyPaletteOverride(cfg.Palette)
-	m.tabs = []*Document{hub.doc}
-	m.active = 0
+	hub.mu.Lock()
+	m.tabs, m.active = hub.snapshot()
+	hub.mu.Unlock()
 	m.readOnly = hub.readOnly
 	m.width, m.height = pty.Window.Width, pty.Window.Height
 

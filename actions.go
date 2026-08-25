@@ -141,6 +141,14 @@ func (m *Model) doCloseTab(i int) bool {
 // program, matching what almost every tabbed editor does, rather than
 // silently replacing it with a blank Untitled document.
 func (m *Model) closeTab(i int) bool {
+	// Closing the last tab normally quits the program — fine solo, but in
+	// a collab session that would wipe the shared session down to zero
+	// tabs out from under every other connected peer. Refuse instead;
+	// whoever wants to actually end the session can just disconnect (a
+	// guest) or quit (the host), which doesn't touch shared state.
+	if m.hub != nil && len(m.tabs) <= 1 {
+		return false
+	}
 	clearAutosave(m.tabs[i])
 	m.tabs = append(m.tabs[:i], m.tabs[i+1:]...)
 	if len(m.tabs) == 0 {

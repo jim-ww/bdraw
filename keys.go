@@ -17,6 +17,17 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// No collab peer — host or guest, read-only or not — ever touches
+	// local disk through the shared session: Save/SaveAs/Open/Export all
+	// read or write files on whatever machine is running the *server*,
+	// and the collab server has no auth, so letting a guest trigger them
+	// would mean any anonymous connection could read or write arbitrary
+	// paths on the host's filesystem. The host's own separate local
+	// terminal session (m.hub == nil there) is unaffected.
+	if m.hub != nil && isFileIOKey(m.km, msg) {
+		return m, nil
+	}
+
 	// A read-only collab guest can look but not touch the shared document.
 	if m.readOnly && isMutatingKey(m.km, msg) {
 		return m, nil
@@ -137,12 +148,18 @@ func isToolSwitchKey(km KeyMap, msg tea.KeyMsg) bool {
 	)
 }
 
+// isFileIOKey reports whether msg matches a binding that reads or writes
+// local disk — always host-only in a collab session, see handleKey.
+func isFileIOKey(km KeyMap, msg tea.KeyMsg) bool {
+	return key.Matches(msg, km.Save, km.SaveAs, km.Open, km.Export)
+}
+
 // isMutatingKey reports whether msg matches a binding that edits the
-// document (or otherwise acts on it in a way a read-only collab guest
-// shouldn't be able to trigger).
+// shared document, which a read-only collab guest shouldn't be able to
+// trigger. File I/O is handled separately by isFileIOKey.
 func isMutatingKey(km KeyMap, msg tea.KeyMsg) bool {
 	return key.Matches(msg,
 		km.Undo, km.Redo, km.Delete, km.Paste, km.New, km.Clear,
-		km.Save, km.SaveAs, km.Open,
+		km.NewTab, km.CloseTab,
 	)
 }

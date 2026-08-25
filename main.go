@@ -51,21 +51,54 @@ func main() {
 		m.openInitialFile(path)
 	}
 
-	if *collab {
-		go func() {
-			if err := runCollabServer(*collabAddr, m.doc(), *collabReadOnly, m.cfg); err != nil {
-				fmt.Fprintln(os.Stderr, "bdraw: collab server:", err)
-				os.Exit(1)
-			}
-		}()
-		note := ""
-		if *collabReadOnly {
-			note = " (guests are read-only)"
+	if !*collab {
+		p := tea.NewProgram(m)
+		if _, err := p.Run(); err != nil {
+			fmt.Fprintln(os.Stderr, "bdraw:", err)
+			os.Exit(1)
 		}
-		m.status = fmt.Sprintf("collab server listening on %s — ssh <name>@host to join%s", *collabAddr, note)
+		return
 	}
 
-	p := tea.NewProgram(m)
+	// The host is peer 0 in its own Hub, the same way every SSH guest
+	// is — not a privileged bystander that guests happen to sync
+	// against. That's what makes tab creation/switching/closing (and
+	// every edit) broadcast out to guests instead of only becoming
+	// visible to them once they generate their own event; before this,
+	// only the shared *Document's content propagated (via pointer
+	// aliasing), never the host's own tab-list changes.
+	hub := NewHub(m.tabs, m.active, *collabReadOnly)
+
+	go func() {
+		if err := runCollabServer(*collabAddr, hub, m.cfg); err != nil {
+			fmt.Fprintln(os.Stderr, "bdraw: collab server:", err)
+			os.Exit(1)
+		}
+	}()
+
+	// Same Join-before-Program-exists trick as serveCollabSession
+	// (collab.go): Join needs a Send callback, the Program needs the
+	// fully-populated model (with peerID/color from Join) to construct.
+	var p *tea.Program
+	send := func(msg tea.Msg) {
+		if p != nil {
+			p.Send(msg)
+		}
+	}
+	id, color := hub.Join("host", send)
+	m.hub = hub
+	m.peerID = id
+	m.peerName = "host"
+	m.peerColor = color
+	m.readOnly = false // the host always has full rights, regardless of -collab-readonly
+
+	note := ""
+	if *collabReadOnly {
+		note = " (guests are read-only)"
+	}
+	m.status = fmt.Sprintf("collab server listening on %s — ssh <name>@host to join%s", *collabAddr, note)
+
+	p = tea.NewProgram(m)
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "bdraw:", err)
 		os.Exit(1)

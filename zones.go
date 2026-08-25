@@ -130,6 +130,29 @@ func (m Model) handleZoneClick(id string) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// Same collab restrictions as handleKey (keys.go): file I/O is
+	// host-only regardless of read-only status, and read-only guests
+	// can't touch the document at all — toolbar buttons reach these
+	// actions through this zone-click path instead of a keybind, so the
+	// guard has to be duplicated here rather than caught once.
+	if m.hub != nil {
+		switch id {
+		case zoneNew, zoneOpen, zoneSave, zoneSaveAs, zoneExport:
+			return m, nil
+		}
+		if m.readOnly {
+			switch {
+			case id == zoneClear, id == zoneUndo, id == zoneRedo, id == zoneNewTab:
+				return m, nil
+			}
+			for i := range m.tabs {
+				if id == zoneTabClose(i) {
+					return m, nil
+				}
+			}
+		}
+	}
+
 	switch id {
 	case zoneNew:
 		m.doNew()

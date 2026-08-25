@@ -354,6 +354,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case collabRefreshMsg:
+		if m.hub != nil {
+			m.hub.mu.Lock()
+			m.tabs, m.active = m.hub.snapshot()
+			m.hub.mu.Unlock()
+		}
 		return m, nil
 
 	case autosaveMsg:
