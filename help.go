@@ -96,7 +96,7 @@ var mouseHelp = []string{
 	"left click/drag — draw or act with the current tool",
 	"middle-drag — pan the canvas",
 	"scroll — zoom (over canvas), or adjust size/zoom (over their value)",
-	"shift + drag — constrain: 45° angle for line/arrow, square/circle for rect/oval",
+	"ctrl + drag — constrain: 45° angle for line/arrow, square/circle for rect/oval",
 	"hover — shows tooltips, highlights buttons and the move/eraser target",
 	"click a tab / its × — switch or close that tab",
 }

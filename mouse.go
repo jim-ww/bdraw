@@ -104,7 +104,15 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	constrain := msg.Mouse().Mod&tea.ModShift != 0
+	// Ctrl, not Shift: nearly every terminal (foot included) reserves
+	// Shift+mouse to bypass app mouse-reporting entirely and do native
+	// text selection instead, so a Shift-held click/drag frequently never
+	// reaches bdraw as a mouse event at all — it can even surface as a
+	// spurious release the instant Shift changes state mid-drag, since
+	// the terminal itself is switching modes out from under the app.
+	// Ctrl isn't conventionally claimed by terminals for anything at the
+	// mouse-protocol level, so it doesn't have this problem.
+	constrain := msg.Mouse().Mod&tea.ModCtrl != 0
 
 	switch e := msg.(type) {
 	case tea.MouseClickMsg:
@@ -299,10 +307,11 @@ func (m *Model) toolDown(pt Point) (tea.Model, tea.Cmd) {
 // jumps instead of smoothly.
 const minDragScreenDist = 3
 
-// constrainPoint applies the shift-drag modifier: lines and arrows snap to
+// constrainPoint applies the ctrl-drag modifier: lines and arrows snap to
 // the nearest 45° angle from start, rectangles and ovals snap to an equal
 // width/height (square/circle) — the conventional meaning of shift-drag in
-// most paint tools.
+// most GUI paint tools, but bound to Ctrl here instead since Shift+mouse
+// is conventionally claimed by the terminal itself (see handleMouse).
 func constrainPoint(kind Kind, start, pt Point) Point {
 	dx, dy := pt.X-start.X, pt.Y-start.Y
 	switch kind {
