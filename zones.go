@@ -61,6 +61,7 @@ const (
 	zoneToolText   = "tool-text"
 	zoneToolMove   = "tool-move"
 	zoneToolFill   = "tool-fill"
+	zoneToolArrow  = "tool-arrow"
 
 	zoneSizeInc   = "size-inc"
 	zoneSizeDec   = "size-dec"
@@ -89,7 +90,7 @@ func (m Model) zoneIDs() []string {
 	ids := []string{
 		zoneNew, zoneOpen, zoneSave, zoneSaveAs, zoneExport, zoneClear, zoneUndo, zoneRedo,
 		zoneToolBrush, zoneToolRect, zoneToolCircle, zoneToolLine,
-		zoneToolEraser, zoneToolSelect, zoneToolText, zoneToolMove, zoneToolFill,
+		zoneToolEraser, zoneToolSelect, zoneToolText, zoneToolMove, zoneToolFill, zoneToolArrow,
 		zoneSizeInc, zoneSizeDec, zoneSizeValue, zoneColorButton, zoneZoomIn, zoneZoomOut, zoneZoomValue,
 		zoneGrid, zoneFilled, zoneNewTab, zoneCompact,
 	}
@@ -163,6 +164,8 @@ func (m Model) handleZoneClick(id string) (tea.Model, tea.Cmd) {
 		m.setTool(ToolMove)
 	case zoneToolFill:
 		m.setTool(ToolFill)
+	case zoneToolArrow:
+		m.setTool(ToolArrow)
 
 	case zoneSizeInc:
 		m.sizeInc()

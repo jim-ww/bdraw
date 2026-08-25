@@ -178,6 +178,8 @@ func (r *Raster) drawEdit(e *Edit, ox, oy, zoom float64, color string) {
 	switch e.Kind {
 	case KindStroke, KindLine:
 		r.drawPolyline(pts, size, color)
+	case KindArrow:
+		r.drawArrow(pts, size, color)
 	case KindRect:
 		if e.Filled {
 			r.fillRect(pts, color)
@@ -260,6 +262,42 @@ func (r *Raster) drawPolyline(pts []Point, size float64, color string) {
 	}
 	for i := 0; i+1 < len(pts); i++ {
 		r.drawSegment(pts[i].X, pts[i].Y, pts[i+1].X, pts[i+1].Y, size, color)
+	}
+}
+
+// arrowHeadAngle and arrowHeadFrac control the arrowhead's shape: the angle
+// each barb makes with the shaft, and the barb length as a fraction of the
+// shaft's own length (capped so a short arrow doesn't grow a head bigger
+// than itself).
+const arrowHeadAngle = 0.5 // radians, ~29°
+const arrowHeadFrac = 0.3
+
+func (r *Raster) drawArrow(pts []Point, size float64, color string) {
+	if len(pts) < 2 {
+		return
+	}
+	from, to := pts[0], pts[1]
+	r.drawSegment(from.X, from.Y, to.X, to.Y, size, color)
+
+	dx, dy := to.X-from.X, to.Y-from.Y
+	shaftLen := math.Hypot(dx, dy)
+	if shaftLen == 0 {
+		return
+	}
+	headLen := shaftLen * arrowHeadFrac
+	const maxHead, minHead = 24.0, 4.0
+	if headLen > maxHead {
+		headLen = maxHead
+	}
+	if headLen < minHead {
+		headLen = minHead
+	}
+	angle := math.Atan2(dy, dx)
+	for _, sign := range [2]float64{1, -1} {
+		a := angle + math.Pi - sign*arrowHeadAngle
+		bx := to.X + headLen*math.Cos(a)
+		by := to.Y + headLen*math.Sin(a)
+		r.drawSegment(to.X, to.Y, bx, by, size, color)
 	}
 }
 

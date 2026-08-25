@@ -28,6 +28,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.setTool(ToolMove)
 	case key.Matches(msg, m.km.ToolFill):
 		m.setTool(ToolFill)
+	case key.Matches(msg, m.km.ToolArrow):
+		m.setTool(ToolArrow)
 
 	case key.Matches(msg, m.km.Undo):
 		m.doUndo()

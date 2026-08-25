@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"strings"
 )
@@ -30,6 +31,8 @@ func ExportSVG(d *Document, path string) (skippedFills int, err error) {
 			writeSVGPolyline(&b, e)
 		case KindLine:
 			writeSVGLine(&b, e)
+		case KindArrow:
+			writeSVGArrow(&b, e)
 		case KindRect:
 			writeSVGRect(&b, e)
 		case KindCircle:
@@ -76,6 +79,39 @@ func writeSVGLine(b *strings.Builder, e *Edit) {
 	}
 	fmt.Fprintf(b, `  <line x1="%g" y1="%g" x2="%g" y2="%g" stroke="%s" stroke-width="%g" stroke-linecap="round"/>`+"\n",
 		e.Points[0].X, e.Points[0].Y, e.Points[1].X, e.Points[1].Y, e.Color, e.Size)
+}
+
+// writeSVGArrow draws the shaft plus two head barbs as plain lines,
+// matching raster.go's drawArrow, rather than an SVG <marker> — markers are
+// defined once and can't easily vary per-edit color/size without a
+// separate <marker> per combination.
+func writeSVGArrow(b *strings.Builder, e *Edit) {
+	if len(e.Points) < 2 {
+		return
+	}
+	from, to := e.Points[0], e.Points[1]
+	writeSVGLine(b, e)
+
+	dx, dy := to.X-from.X, to.Y-from.Y
+	shaftLen := math.Hypot(dx, dy)
+	if shaftLen == 0 {
+		return
+	}
+	headLen := shaftLen * arrowHeadFrac
+	if headLen > 24 {
+		headLen = 24
+	}
+	if headLen < 4 {
+		headLen = 4
+	}
+	angle := math.Atan2(dy, dx)
+	for _, sign := range [2]float64{1, -1} {
+		a := angle + math.Pi - sign*arrowHeadAngle
+		bx := to.X + headLen*math.Cos(a)
+		by := to.Y + headLen*math.Sin(a)
+		fmt.Fprintf(b, `  <line x1="%g" y1="%g" x2="%g" y2="%g" stroke="%s" stroke-width="%g" stroke-linecap="round"/>`+"\n",
+			to.X, to.Y, bx, by, e.Color, e.Size)
+	}
 }
 
 func writeSVGRect(b *strings.Builder, e *Edit) {

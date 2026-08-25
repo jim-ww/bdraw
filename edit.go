@@ -10,6 +10,7 @@ const (
 	KindLine   Kind = "line"
 	KindText   Kind = "text"
 	KindFill   Kind = "fill"
+	KindArrow  Kind = "arrow"
 )
 
 // Point is a location in canvas subpixel space (2 subpixels per cell

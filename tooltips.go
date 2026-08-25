@@ -24,6 +24,7 @@ func (m Model) bindingTooltips() map[string]key.Binding {
 		zoneToolSelect: km.ToolSelect,
 		zoneToolMove:   km.ToolMove,
 		zoneToolFill:   km.ToolFill,
+		zoneToolArrow:  km.ToolArrow,
 		zoneToolText:   km.ToolText,
 
 		zoneColorButton: km.ColorPicker,

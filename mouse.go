@@ -186,9 +186,9 @@ func (m *Model) toolDown(pt Point) (tea.Model, tea.Cmd) {
 		d.Edits = append(d.Edits, e)
 		m.dragEdit, m.dragging = e, true
 
-	case ToolLine, ToolRect, ToolCircle:
+	case ToolLine, ToolRect, ToolCircle, ToolArrow:
 		d.BeginChange()
-		kind := map[Tool]Kind{ToolLine: KindLine, ToolRect: KindRect, ToolCircle: KindCircle}[m.tool]
+		kind := map[Tool]Kind{ToolLine: KindLine, ToolRect: KindRect, ToolCircle: KindCircle, ToolArrow: KindArrow}[m.tool]
 		e := &Edit{ID: d.NextID(), Kind: kind, Points: []Point{pt, pt}, Color: m.color, Size: m.size, Filled: m.filled}
 		d.Edits = append(d.Edits, e)
 		m.dragEdit, m.dragging = e, true
@@ -265,7 +265,7 @@ func (m *Model) toolDrag(pt Point) (tea.Model, tea.Cmd) {
 			m.dragEdit.Points = append(m.dragEdit.Points, pt)
 			m.doc().Touch()
 		}
-	case ToolLine, ToolRect, ToolCircle:
+	case ToolLine, ToolRect, ToolCircle, ToolArrow:
 		m.dragEdit.Points[1] = pt
 		m.doc().Touch()
 	case ToolEraser:
@@ -301,7 +301,7 @@ const selectDragThreshold = 10
 
 func (m *Model) toolUp(pt Point) (tea.Model, tea.Cmd) {
 	switch m.tool {
-	case ToolLine, ToolRect, ToolCircle:
+	case ToolLine, ToolRect, ToolCircle, ToolArrow:
 		m.dragEdit.Points[1] = pt
 		m.doc().Touch()
 	case ToolEraser:

@@ -187,6 +187,7 @@ func (m Model) toolbarLines() []string {
 		m.toolButton(zoneToolSelect, ToolSelect, m.tool == ToolSelect),
 		m.toolButton(zoneToolMove, ToolMove, m.tool == ToolMove),
 		m.toolButton(zoneToolFill, ToolFill, m.tool == ToolFill),
+		m.toolButton(zoneToolArrow, ToolArrow, m.tool == ToolArrow),
 		m.toolButton(zoneToolText, ToolText, m.tool == ToolText),
 		m.button(zoneFilled, "Filled: "+onOff(m.filled), m.filled),
 		m.colorButton(),
@@ -361,7 +362,7 @@ func (m Model) viewCanvas() string {
 
 			switch {
 			case m.cursorVisible && m.mode == modeNormal && col == m.cursorCol && row == m.cursorRow:
-				ru, color = toolCursor[m.tool], cursorColor
+				ru, color = toolCursor[m.tool], m.cursorColor()
 			case marquee && (col == mx0 || col == mx1) && row >= my0 && row <= my1,
 				marquee && (row == my0 || row == my1) && col >= mx0 && col <= mx1:
 				if ru == ' ' {

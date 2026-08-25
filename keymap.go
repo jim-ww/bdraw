@@ -20,6 +20,7 @@ type KeyMap struct {
 	ToolText   key.Binding
 	ToolMove   key.Binding
 	ToolFill   key.Binding
+	ToolArrow  key.Binding
 
 	Undo           key.Binding
 	Redo           key.Binding
@@ -72,6 +73,7 @@ func DefaultKeyMap() KeyMap {
 		ToolText:   bind([]string{"t"}, "text"),
 		ToolMove:   bind([]string{"m"}, "move"),
 		ToolFill:   bind([]string{"f"}, "fill"),
+		ToolArrow:  bind([]string{"a"}, "arrow"),
 
 		Undo:           bind([]string{"ctrl+z"}, "undo"),
 		Redo:           bind([]string{"ctrl+shift+z", "ctrl+y"}, "redo"),
@@ -102,8 +104,11 @@ func DefaultKeyMap() KeyMap {
 		PanDown:  bind([]string{"down"}, "pan down"),
 		PanLeft:  bind([]string{"left"}, "pan left"),
 		PanRight: bind([]string{"right"}, "pan right"),
-		ZoomIn:   bind([]string{"ctrl+="}, "zoom in"),
-		ZoomOut:  bind([]string{"ctrl+-"}, "zoom out"),
+		// Not ctrl+=/ctrl+-: most terminal emulators intercept those
+		// themselves for their own font-size zoom, so the app would never
+		// even see the keypress. Brackets are rarely claimed by anything.
+		ZoomIn:  bind([]string{"]"}, "zoom in"),
+		ZoomOut: bind([]string{"["}, "zoom out"),
 
 		Quit: bind([]string{"ctrl+c"}, "quit"),
 	}
@@ -152,6 +157,7 @@ func applyOverrides(km *KeyMap, overrides keyOverrides) {
 		"tool_text":       &km.ToolText,
 		"tool_move":       &km.ToolMove,
 		"tool_fill":       &km.ToolFill,
+		"tool_arrow":      &km.ToolArrow,
 		"undo":            &km.Undo,
 		"redo":            &km.Redo,
 		"delete":          &km.Delete,

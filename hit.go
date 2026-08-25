@@ -7,7 +7,7 @@ import "math"
 // whole edit the cursor touches) and the select tool (click nearest edit).
 func (e *Edit) Distance(p Point) float64 {
 	switch e.Kind {
-	case KindStroke, KindLine:
+	case KindStroke, KindLine, KindArrow:
 		return polylineDistance(e.Points, p)
 	case KindRect:
 		if e.Filled && pointInRect(e.Points, p) {

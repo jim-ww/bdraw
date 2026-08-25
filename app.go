@@ -18,6 +18,7 @@ const (
 	ToolText   Tool = "text"
 	ToolMove   Tool = "move"
 	ToolFill   Tool = "fill"
+	ToolArrow  Tool = "arrow"
 )
 
 // toolCursor is the glyph drawn at the mouse position for each tool, so the
@@ -27,15 +28,34 @@ var toolCursor = map[Tool]rune{
 	ToolRect:   '▭',
 	ToolCircle: '◯',
 	ToolLine:   '╱',
-	ToolEraser: '▢',
+	ToolEraser: '⌫',
 	ToolSelect: '↖',
 	ToolText:   'T',
 	ToolMove:   '✥',
 	ToolFill:   '▓',
+	ToolArrow:  '➔',
 }
 
-const cursorColor = "#00ffaa"
+// drawTools are tools whose cursor should reflect the current draw color;
+// everything else (select/move/eraser) doesn't paint in that color, so its
+// cursor stays a neutral, always-visible tone instead.
+var drawTools = map[Tool]bool{
+	ToolBrush: true, ToolRect: true, ToolCircle: true, ToolLine: true,
+	ToolText: true, ToolFill: true, ToolArrow: true,
+}
+
+const neutralCursorColor = "#00ffaa"
 const hoverEditColor = "#00ffaa"
+
+// cursorColor is what the tool cursor glyph is drawn in: the current draw
+// color for tools that paint with it, or a neutral highlight for tools
+// (select/move/eraser) that don't.
+func (m Model) cursorColor() string {
+	if drawTools[m.tool] {
+		return m.color
+	}
+	return neutralCursorColor
+}
 
 // Palette is the fixed set of quick-pick colors offered in the color-picker
 // modal.
@@ -170,7 +190,7 @@ func NewModel() Model {
 		input:    ti,
 		cache:    &canvasCache{},
 		showGrid: true,
-		status:   "mouse to draw · b/r/c/l/e/s/t/m tools · scroll/ctrl+=/- zoom · arrows/middle-drag pan · ctrl+q quit",
+		status:   "mouse to draw · b/r/c/l/a/e/s/t/m tools · scroll/[/] zoom · arrows/middle-drag pan · ctrl+q quit",
 	}
 }
 
