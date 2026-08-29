@@ -37,6 +37,7 @@ func TestEdgePanExtendsDragAcrossPan(t *testing.T) {
 	m.width, m.height = 40, 20
 	m.tool = ToolLine
 	m.cursorVisible = true
+	m.cfg.EnableEdgePan = true
 
 	cols, _ := m.canvasSize()
 	m.cursorCol, m.cursorRow = cols - 1, 5 // sit at the right edge
@@ -65,6 +66,7 @@ func TestEdgePanHoverAloneTriggers(t *testing.T) {
 	m := NewModel("")
 	m.width, m.height = 40, 20
 	m.cursorVisible = true
+	m.cfg.EnableEdgePan = true
 	if m.dragging {
 		t.Fatal("test setup: expected no drag in progress")
 	}
@@ -81,12 +83,11 @@ func TestEdgePanHoverAloneTriggers(t *testing.T) {
 	}
 }
 
-// TestEdgePanDisabledByConfig checks the DisableEdgePan config flag is
-// actually honored.
-func TestEdgePanDisabledByConfig(t *testing.T) {
+// TestEdgePanOffByDefault checks edge-pan stays off unless EnableEdgePan
+// is explicitly set in config.
+func TestEdgePanOffByDefault(t *testing.T) {
 	m := NewModel("")
 	m.width, m.height = 40, 20
-	m.cfg.DisableEdgePan = true
 	m.tool = ToolLine
 	m.cursorVisible = true
 
@@ -102,6 +103,6 @@ func TestEdgePanDisabledByConfig(t *testing.T) {
 	m = newModel.(Model)
 
 	if m.viewOffset() != before {
-		t.Fatal("DisableEdgePan should prevent any panning")
+		t.Fatal("edge-pan should be off by default")
 	}
 }

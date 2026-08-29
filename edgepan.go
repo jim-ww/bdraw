@@ -74,7 +74,7 @@ func (m Model) edgePanDelta() (dx, dy float64, ok bool) {
 // out from under a stroke/selection that never actually extends past
 // whatever was visible when the cursor first reached the edge.
 func (m Model) handleEdgePan() (tea.Model, tea.Cmd) {
-	if m.cfg.DisableEdgePan {
+	if !m.cfg.EnableEdgePan {
 		return m, edgePanTick()
 	}
 	dx, dy, ok := m.edgePanDelta()
