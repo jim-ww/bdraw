@@ -277,17 +277,18 @@ func (r *Raster) floodFill(e *Edit, ox, oy, zoom float64, color string) {
 
 // maxScreenSize is a pure anti-overflow guard, not a visual clamp: it only
 // keeps size*zoom (radius math derives ints from this) from overflowing at
-// the extreme end of the app's zoom range. It must never be small enough to
-// actually be reached by real brush sizes at real zoom levels — clamping
-// screen-space thickness independent of zoom used to be how this worked,
-// but that broke WYSIWYG: a thick brush stroke whose overlaps make it read
-// as a solid filled blob at low zoom would, past whatever zoom made
+// the extreme end of the app's zoom range. It must sit above sizeMax*zoomMax
+// — the largest legitimate size*zoom, a max-size brush at max zoom — or it
+// silently becomes a real visual clamp again for exactly that combination.
+// Clamping screen-space thickness independent of zoom used to be how this
+// worked, but that broke WYSIWYG: a thick brush stroke whose overlaps make
+// it read as a solid filled blob at low zoom would, past whatever zoom made
 // size*zoom cross the cap, keep the traced path growing on screen while the
 // ink thickness stayed pinned — hollowing the "filled" shape into a ring as
 // you zoomed in. plotThickHard/plotThickSoft now bound their own cost to
 // the visible raster instead (see their dx/dy clipping), so nothing here
 // needs to protect against radius^2 cost anymore.
-const maxScreenSize = 1e6
+const maxScreenSize = sizeMax * zoomMax * 10
 
 func screenSize(size, zoom float64) float64 {
 	s := size * zoom
