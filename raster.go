@@ -275,12 +275,19 @@ func (r *Raster) floodFill(e *Edit, ox, oy, zoom float64, color string) {
 	}
 }
 
-// maxScreenSize clamps screen-space thickness: past this point a fatter
-// brush is visually just a solid blob, but plotThick's cost grows with
-// radius, so an unclamped size*zoom (e.g. a fat brush at 800% zoom) makes
-// every point of every stroke drawn this frame far more expensive than the
-// extra thickness is worth.
-const maxScreenSize = 64
+// maxScreenSize is a pure anti-overflow guard, not a visual clamp: it only
+// keeps size*zoom (radius math derives ints from this) from overflowing at
+// the extreme end of the app's zoom range. It must never be small enough to
+// actually be reached by real brush sizes at real zoom levels — clamping
+// screen-space thickness independent of zoom used to be how this worked,
+// but that broke WYSIWYG: a thick brush stroke whose overlaps make it read
+// as a solid filled blob at low zoom would, past whatever zoom made
+// size*zoom cross the cap, keep the traced path growing on screen while the
+// ink thickness stayed pinned — hollowing the "filled" shape into a ring as
+// you zoomed in. plotThickHard/plotThickSoft now bound their own cost to
+// the visible raster instead (see their dx/dy clipping), so nothing here
+// needs to protect against radius^2 cost anymore.
+const maxScreenSize = 1e6
 
 func screenSize(size, zoom float64) float64 {
 	s := size * zoom
@@ -619,11 +626,33 @@ func (r *Raster) plotThick(x, y, size, hardness float64, color string) {
 	r.plotThickSoft(x, y, radius, hardness, color)
 }
 
+// plotThickHard's loop bounds are clipped to the visible raster rather than
+// just the disc's own radius: a fat brush zoomed in far enough has a huge
+// radius in subpixels, but almost none of that disc is ever on screen, so
+// iterating the full radius^2 box per stamp (see drawSegment) is wasted
+// work that scales with brush size instead of with what's actually
+// rendered. Clipping first keeps cost bounded by the viewport regardless of
+// how big the brush gets, without ever clamping the radius itself (which is
+// what used to break WYSIWYG — see maxScreenSize).
 func (r *Raster) plotThickHard(x, y, radius float64, color string) {
 	ix, iy := int(math.Round(x)), int(math.Round(y))
 	ri := int(math.Ceil(radius))
-	for dy := -ri; dy <= ri; dy++ {
-		for dx := -ri; dx <= ri; dx++ {
+	dxLo, dxHi := -ri, ri
+	if lo := -ix; lo > dxLo {
+		dxLo = lo
+	}
+	if hi := r.Cols*SubpixW - 1 - ix; hi < dxHi {
+		dxHi = hi
+	}
+	dyLo, dyHi := -ri, ri
+	if lo := -iy; lo > dyLo {
+		dyLo = lo
+	}
+	if hi := r.Rows*SubpixH - 1 - iy; hi < dyHi {
+		dyHi = hi
+	}
+	for dy := dyLo; dy <= dyHi; dy++ {
+		for dx := dxLo; dx <= dxHi; dx++ {
 			if math.Hypot(float64(dx), float64(dy)) > radius {
 				continue
 			}
@@ -656,12 +685,26 @@ func (r *Raster) plotThickSoft(x, y, radius, hardness float64, color string) {
 	ccol, crow := int(math.Round(x/SubpixW)), int(math.Round(y/SubpixH))
 	rc := int(math.Ceil(radius/SubpixW)) + 1
 	rr := int(math.Ceil(radius/SubpixH)) + 1
-	for dr := -rr; dr <= rr; dr++ {
-		for dc := -rc; dc <= rc; dc++ {
+	// Clipped to the raster's own bounds for the same reason as
+	// plotThickHard: cost must scale with what's visible, not with how big
+	// the brush's radius happens to be at the current zoom.
+	dcLo, dcHi := -rc, rc
+	if lo := -ccol; lo > dcLo {
+		dcLo = lo
+	}
+	if hi := r.Cols - 1 - ccol; hi < dcHi {
+		dcHi = hi
+	}
+	drLo, drHi := -rr, rr
+	if lo := -crow; lo > drLo {
+		drLo = lo
+	}
+	if hi := r.Rows - 1 - crow; hi < drHi {
+		drHi = hi
+	}
+	for dr := drLo; dr <= drHi; dr++ {
+		for dc := dcLo; dc <= dcHi; dc++ {
 			col, row := ccol+dc, crow+dr
-			if col < 0 || row < 0 || col >= r.Cols || row >= r.Rows {
-				continue
-			}
 			cx := float64(col)*SubpixW + SubpixW/2
 			cy := float64(row)*SubpixH + SubpixH/2
 			d := math.Hypot(cx-x, cy-y)
