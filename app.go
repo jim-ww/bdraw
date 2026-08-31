@@ -98,8 +98,14 @@ const (
 )
 
 const (
-	zoomMin  = 0.25
-	zoomMax  = 8
+	// zoomMin/zoomMax are set far past anything a terminal screen could
+	// usefully show, rather than removed outright: zoom is a divisor
+	// throughout (world<->screen conversion, edge-pan step size, grid
+	// spacing), so letting it reach exactly 0 or grow unbounded would turn
+	// those into Inf/NaN. This is "infinite" zoom in every practical
+	// sense while keeping that arithmetic safe.
+	zoomMin  = 0.0001
+	zoomMax  = 10000
 	zoomStep = 1.25
 	panStep  = 8 // world subpixels per arrow-key press
 )
