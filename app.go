@@ -107,7 +107,7 @@ const (
 	zoomMin  = 0.0001
 	zoomMax  = 10000
 	zoomStep = 1.25
-	panStep  = 8 // world subpixels per arrow-key press
+	panStep  = 8 // screen subpixels per arrow-key press, independent of zoom (see panBy)
 )
 
 const (

@@ -115,10 +115,16 @@ func (m *Model) zoomAtCursor(factor float64) {
 	m.zoomBy(factor)
 }
 
+// panBy moves the viewport by (dx, dy) screen subpixels, converting to
+// world units by the current zoom so an arrow-key pan always covers the
+// same distance on screen — panning by a fixed world-space step made the
+// same key press crawl at high zoom and blow past the whole canvas at low
+// zoom.
 func (m *Model) panBy(dx, dy float64) {
+	zoom := m.viewZoom()
 	offset := m.viewOffset()
-	offset.X += dx
-	offset.Y += dy
+	offset.X += dx / zoom
+	offset.Y += dy / zoom
 	m.setViewOffset(offset)
 }
 
