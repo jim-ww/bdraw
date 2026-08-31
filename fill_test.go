@@ -29,6 +29,18 @@ func TestFillZoomedNearEdgeRejected(t *testing.T) {
 	}
 }
 
+// TestFillBoundedSmallShape reproduces the reported "can't fill" bug: the
+// boundedness probe used a single fixed-radius, coarse-resolution window
+// sized for large shapes, so a small (and very ordinary) enclosed shape's
+// walls were thinner than one probe cell and the flood couldn't even get
+// started, reading a genuinely enclosed shape as unbounded.
+func TestFillBoundedSmallShape(t *testing.T) {
+	rect := &Edit{ID: 1, Kind: KindRect, Points: []Point{{X: 0, Y: 0}, {X: 20, Y: 20}}, Color: "#fff", Size: 1}
+	if !isFillBounded([]*Edit{rect}, Point{X: 10, Y: 10}) {
+		t.Error("small enclosed rectangle should still be fillable")
+	}
+}
+
 func countFillCells(r *Raster, cols, rows int) int {
 	n := 0
 	for row := 0; row < rows; row++ {

@@ -114,45 +114,64 @@ func RasterizeDocument(edits []*Edit, cols, rows int, ox, oy, zoom float64, sele
 	return r
 }
 
-// fillProbeRadius/fillProbeCols/fillProbeRows/fillProbeZoom define a fixed,
-// viewport-independent window (a 4096x4096 world-subpixel square around the
-// fill's seed point, at coarse resolution) used purely to answer "is this
-// fill still enclosed by ink" — independent of whatever the user currently
-// has panned/zoomed to. A shape larger than this window in every direction
-// is vanishingly unlikely for a terminal painting.
-const (
-	fillProbeRadius = 2048.0
-	fillProbeCols   = 256
-	fillProbeRows   = 128
-	fillProbeZoom   = 0.125
-)
+// fillProbeCols/fillProbeRows is the fixed cell budget spent on every
+// boundedness check. fillProbeLevels are the (radius, zoom) windows tried,
+// finest first: a single fixed-radius coarse probe (the original design)
+// resolved a distant boundary fine, but for a small shape — the common
+// case, since most drawings are far smaller than the world — its cells
+// were wider than the whole shape, so the seed and the enclosing ink could
+// land in the very same cell and the flood couldn't even get started (see
+// isFillBounded). Starting fine and only widening the window when the
+// flood actually runs off the edge of it gives small shapes the
+// resolution they need while still falling back to the old coarse, wide
+// probe for shapes bigger than the fine window.
+var fillProbeLevels = [...]struct {
+	radius, zoom float64
+}{
+	{radius: 128, zoom: 1},
+	{radius: 2048, zoom: 0.125},
+}
 
 // isFillBounded reports whether a flood fill seeded at p is enclosed by ink
 // from edits, regardless of the current viewport.
 func isFillBounded(edits []*Edit, p Point) bool {
-	ox, oy := p.X-fillProbeRadius, p.Y-fillProbeRadius
-	probe := &Raster{Cols: fillProbeCols, Rows: fillProbeRows, cells: make([]cell, fillProbeCols*fillProbeRows)}
-	for _, e := range edits {
-		probe.drawEdit(e, ox, oy, fillProbeZoom, e.Color)
+	for _, lvl := range fillProbeLevels {
+		ox, oy := p.X-lvl.radius, p.Y-lvl.radius
+		probe := &Raster{Cols: fillProbeCols, Rows: fillProbeRows, cells: make([]cell, fillProbeCols*fillProbeRows)}
+		for _, e := range edits {
+			probe.drawEdit(e, ox, oy, lvl.zoom, e.Color)
+		}
+		col := int(((p.X - ox) * lvl.zoom) / SubpixW)
+		row := int(((p.Y - oy) * lvl.zoom) / SubpixH)
+		cells, touchesEdge := probe.floodRegion(col, row)
+		// touchesEdge means the flood ran off this window without finding
+		// enclosing ink — could be genuinely open, or could just mean the
+		// shape is bigger than this window. Escalate to the next, wider
+		// level rather than concluding either way.
+		if touchesEdge {
+			continue
+		}
+		// len(cells) == 0 means the seed's own probe cell already reads as
+		// ink, so floodRegion never even started — that's not necessarily
+		// because the seed is genuinely on a line: the probe cell can
+		// cover a wide swath of world space, so a seed a few world units
+		// outside a thin wall can land in the very same cell as that
+		// wall's dot and read as solid. Reading that as "bounded" was the
+		// actual bug: it let a click just outside an object's edge — the
+		// extremely common case of zooming in close to something and
+		// clicking just past its border — create a fill that, rendered at
+		// real resolution where the seed truly is empty, had nothing
+		// stopping it and flooded the whole open background. Treat "the
+		// probe couldn't even start" as unknown and escalate, rather than
+		// as safe.
+		if len(cells) > 0 {
+			return true
+		}
 	}
-	col := int(((p.X - ox) * fillProbeZoom) / SubpixW)
-	row := int(((p.Y - oy) * fillProbeZoom) / SubpixH)
-	cells, touchesEdge := probe.floodRegion(col, row)
-	// len(cells) == 0 means the seed's own probe cell already reads as
-	// ink, so floodRegion never even started — that's not necessarily
-	// because the seed is genuinely on a line: the probe is deliberately
-	// coarse (one cell covers a wide swath of world space, for
-	// performance), so a seed a few world units outside a thin wall can
-	// land in the very same cell as that wall's dot and read as solid.
-	// Reading that as "bounded" was the actual bug: it let a click just
-	// outside an object's edge — the extremely common case of zooming in
-	// close to something and clicking just past its border — create a
-	// fill that, rendered at real resolution where the seed truly is
-	// empty, had nothing stopping it and flooded the whole open
-	// background. Treat "the probe couldn't even start" as unknown, not
-	// as safe.
-	return !touchesEdge && len(cells) > 0
+	return false
 }
+
+const fillProbeCols, fillProbeRows = 256, 128
 
 type gridCoord struct{ col, row int }
 
