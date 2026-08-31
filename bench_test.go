@@ -34,7 +34,7 @@ func BenchmarkRasterizeDocument(b *testing.B) {
 		b.Run(fmt.Sprintf("edits=%d", n), func(b *testing.B) {
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
-				RasterizeDocument(edits, 160, 45, 0, 0, 1, "#ffaa00", 0, "")
+				RasterizeDocument(edits, 160, 45, 0, 0, 1, "#ffaa00", 0, "", nil, 0)
 			}
 		})
 	}

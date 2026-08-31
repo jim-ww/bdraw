@@ -68,6 +68,22 @@ func (r *Raster) clone() *Raster {
 	return &Raster{Cols: r.Cols, Rows: r.Rows, cells: cells}
 }
 
+// fillBoundEntry is one cached isFillBounded verdict, tagged with the
+// document version it was computed against.
+type fillBoundEntry struct {
+	ver     int
+	bounded bool
+}
+
+// FillBoundCache memoizes isFillBounded per fill edit, keyed by document
+// version. isFillBounded is independent of the viewport, but panning or
+// zooming still forces a full RasterizeDocument every frame (the render
+// cache keys off viewport state too — see canvasRaster) — without this,
+// every fill on the canvas re-probed the entire document on every single
+// pan/zoom tick, which is what made scrolling a canvas with more than a
+// few fills visibly lag (see BenchmarkRasterizeDocumentWithFills).
+type FillBoundCache map[int]fillBoundEntry
+
 // RasterizeDocument draws edits into a Cols x Rows grid. (ox, oy) is the
 // world coordinate at the viewport's top-left and zoom is world-to-screen
 // scale (subpixels of screen per subpixel of world).
@@ -79,7 +95,11 @@ func (r *Raster) clone() *Raster {
 // Fill edits are applied in a second pass, after every other edit, since a
 // flood fill needs the full set of ink boundaries already in place to know
 // where to stop.
-func RasterizeDocument(edits []*Edit, cols, rows int, ox, oy, zoom float64, selectColor string, highlightID int, highlightColor string) *Raster {
+//
+// cache and ver together memoize each fill's boundedness check across
+// calls that share the same document version; cache may be nil to skip
+// memoization (e.g. a one-off export).
+func RasterizeDocument(edits []*Edit, cols, rows int, ox, oy, zoom float64, selectColor string, highlightID int, highlightColor string, cache FillBoundCache, ver int) *Raster {
 	r := &Raster{Cols: cols, Rows: rows, cells: make([]cell, cols*rows)}
 	pick := func(e *Edit) string {
 		switch {
@@ -102,12 +122,27 @@ func RasterizeDocument(edits []*Edit, cols, rows int, ox, oy, zoom float64, sele
 		r.drawEdit(e, ox, oy, zoom, pick(e))
 	}
 	for _, e := range fills {
+		if len(e.Points) == 0 {
+			continue
+		}
 		// Re-validate boundedness on every render, not just at creation:
 		// the enclosing shape can be edited or deleted after the fill
 		// exists. This has to be independent of the current viewport (see
 		// isFillBounded) — checking against the visible raster itself is
 		// exactly the bug that made a valid fill disappear on zoom.
-		if len(e.Points) > 0 && isFillBounded(nonFills, e.Points[0]) {
+		bounded, ok := false, false
+		if cache != nil {
+			if entry, hit := cache[e.ID]; hit && entry.ver == ver {
+				bounded, ok = entry.bounded, true
+			}
+		}
+		if !ok {
+			bounded = isFillBounded(nonFills, e.Points[0])
+			if cache != nil {
+				cache[e.ID] = fillBoundEntry{ver: ver, bounded: bounded}
+			}
+		}
+		if bounded {
 			r.floodFill(e, ox, oy, zoom, pick(e))
 		}
 	}

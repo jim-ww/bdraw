@@ -41,6 +41,37 @@ func TestFillBoundedSmallShape(t *testing.T) {
 	}
 }
 
+// TestFillBoundCacheReusedAcrossSameVersion checks that isFillBounded's
+// (relatively expensive) probe is skipped on a second render at the same
+// document version — e.g. while just panning or zooming, not editing —
+// and is correctly redone once the version changes.
+func TestFillBoundCacheReusedAcrossSameVersion(t *testing.T) {
+	rect := &Edit{ID: 1, Kind: KindRect, Points: []Point{{X: 0, Y: 0}, {X: 200, Y: 200}}, Color: "#ffffff", Size: 1}
+	fill := &Edit{ID: 2, Kind: KindFill, Points: []Point{{X: 100, Y: 100}}, Color: "#ff0000"}
+	edits := []*Edit{rect, fill}
+	cache := FillBoundCache{}
+
+	RasterizeDocument(edits, 100, 40, 0, 0, 1, "", 0, "", cache, 1)
+	entry, ok := cache[fill.ID]
+	if !ok || entry.ver != 1 || !entry.bounded {
+		t.Fatalf("expected a cached bounded=true entry at ver 1, got %+v (ok=%v)", entry, ok)
+	}
+
+	// Same version, different viewport (pan/zoom): the cached verdict
+	// should carry over unchanged rather than being recomputed.
+	RasterizeDocument(edits, 100, 40, 50, 50, 2, "", 0, "", cache, 1)
+	if cache[fill.ID] != entry {
+		t.Fatal("cache entry should not change across renders at the same document version")
+	}
+
+	// New version: must be recomputed, not served stale.
+	edits = []*Edit{fill} // boundary removed
+	RasterizeDocument(edits, 100, 40, 0, 0, 1, "", 0, "", cache, 2)
+	if got := cache[fill.ID]; got.ver != 2 || got.bounded {
+		t.Fatalf("expected recomputed bounded=false entry at ver 2, got %+v", got)
+	}
+}
+
 func countFillCells(r *Raster, cols, rows int) int {
 	n := 0
 	for row := 0; row < rows; row++ {
@@ -59,7 +90,7 @@ func countFillCells(r *Raster, cols, rows int) int {
 func TestFillSurvivesZoomIn(t *testing.T) {
 	rect := &Edit{ID: 1, Kind: KindRect, Points: []Point{{X: 0, Y: 0}, {X: 200, Y: 200}}, Color: "#ffffff", Size: 1}
 	fill := &Edit{ID: 2, Kind: KindFill, Points: []Point{{X: 100, Y: 100}}, Color: "#ff0000"}
-	r := RasterizeDocument([]*Edit{rect, fill}, 100, 40, 90, 90, 8, "", 0, "")
+	r := RasterizeDocument([]*Edit{rect, fill}, 100, 40, 90, 90, 8, "", 0, "", nil, 0)
 	if countFillCells(r, 100, 40) == 0 {
 		t.Fatal("fill disappeared after zooming past the boundary")
 	}
@@ -70,7 +101,7 @@ func TestFillSurvivesZoomIn(t *testing.T) {
 // must not spill across the whole (now-open) canvas.
 func TestFillDoesNotSpillWhenBoundaryRemoved(t *testing.T) {
 	fill := &Edit{ID: 2, Kind: KindFill, Points: []Point{{X: 100, Y: 100}}, Color: "#ff0000"}
-	r := RasterizeDocument([]*Edit{fill}, 100, 40, 0, 0, 1, "", 0, "")
+	r := RasterizeDocument([]*Edit{fill}, 100, 40, 0, 0, 1, "", 0, "", nil, 0)
 	if n := countFillCells(r, 100, 40); n != 0 {
 		t.Fatalf("fill spilled across the whole viewport after boundary removed: %d cells", n)
 	}

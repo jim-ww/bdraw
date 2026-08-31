@@ -8,7 +8,7 @@ import "testing"
 // as before — no glyph override anywhere in the stroke.
 func TestHardnessDefaultMatchesHistoricalBraille(t *testing.T) {
 	e := &Edit{ID: 1, Kind: KindStroke, Points: []Point{{X: 30, Y: 30}}, Color: "#fff", Size: 20}
-	r := RasterizeDocument([]*Edit{e}, 30, 15, 0, 0, 1, "", 0, "")
+	r := RasterizeDocument([]*Edit{e}, 30, 15, 0, 0, 1, "", 0, "", nil, 0)
 	for row := 0; row < 15; row++ {
 		for col := 0; col < 30; col++ {
 			if r.at(col, row).glyph != 0 {
@@ -23,7 +23,7 @@ func TestHardnessDefaultMatchesHistoricalBraille(t *testing.T) {
 // hard-edge disc.
 func TestHardnessSoftEdgeFeathers(t *testing.T) {
 	e := &Edit{ID: 1, Kind: KindStroke, Points: []Point{{X: 30, Y: 30}}, Color: "#fff", Size: 20, Hardness: 30}
-	r := RasterizeDocument([]*Edit{e}, 30, 15, 0, 0, 1, "", 0, "")
+	r := RasterizeDocument([]*Edit{e}, 30, 15, 0, 0, 1, "", 0, "", nil, 0)
 
 	center := r.at(15, 7)
 	if center.glyph != '█' {
@@ -58,7 +58,7 @@ func TestHardnessSoftEdgeFeathers(t *testing.T) {
 // continuous solid core with a feathered edge.
 func TestHardnessDraggedStrokeHasNoCheckerboard(t *testing.T) {
 	e := &Edit{ID: 1, Kind: KindStroke, Points: []Point{{X: 10, Y: 30}, {X: 150, Y: 30}}, Color: "#fff", Size: 20, Hardness: 40}
-	r := RasterizeDocument([]*Edit{e}, 80, 15, 0, 0, 1, "", 0, "")
+	r := RasterizeDocument([]*Edit{e}, 80, 15, 0, 0, 1, "", 0, "", nil, 0)
 
 	// Well clear of both endpoints, the interior of the capsule's core
 	// row should be solid the entire way across — not alternating with

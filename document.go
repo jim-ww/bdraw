@@ -22,6 +22,10 @@ type Document struct {
 	// autosaveID names this document's recovery file for the life of the
 	// session (see autosave.go) — stable even before it has a real Path.
 	autosaveID string
+
+	// fillCache memoizes each fill edit's boundedness check across renders
+	// that share the same Version — see FillBoundCache.
+	fillCache FillBoundCache
 }
 
 // NewDocument returns an empty, untitled document.

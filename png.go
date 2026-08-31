@@ -23,7 +23,7 @@ func ExportPNG(d *Document, path string) error {
 	rows := (h + SubpixH - 1) / SubpixH
 	ox, oy := minX-pad, minY-pad
 
-	r := RasterizeDocument(d.Edits, cols, rows, ox, oy, 1, "", 0, "")
+	r := RasterizeDocument(d.Edits, cols, rows, ox, oy, 1, "", 0, "", nil, 0)
 
 	img := image.NewRGBA(image.Rect(0, 0, cols*SubpixW, rows*SubpixH))
 	blank := color.RGBA{0, 0, 0, 255}
