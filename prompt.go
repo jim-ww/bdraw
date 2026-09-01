@@ -42,6 +42,16 @@ func (m Model) handlePromptKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	if m.mode == modeConfirmNewFile {
+		switch msg.String() {
+		case "y", "enter":
+			m.newFileAt(m.pendingNewPath)
+		}
+		m.mode = modeNormal
+		m.pendingNewPath = ""
+		return m, nil
+	}
+
 	// While the open prompt's path field is empty, digits pick a recent
 	// file directly instead of being typed — a blank field has nothing
 	// else a digit could mean.
