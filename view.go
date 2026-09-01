@@ -547,6 +547,8 @@ func (m Model) viewStatus() string {
 		return "unsaved changes — close anyway? (y/n)"
 	case modeConfirmClear:
 		return "clear the whole canvas? (y/n)"
+	case modeConfirmNewFile:
+		return m.pendingNewPath + " doesn't exist — create it? (y/n)"
 	case modeNumberEntry:
 		return ""
 	}

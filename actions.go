@@ -1,8 +1,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"math"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -350,7 +352,17 @@ func (m *Model) saveTo(path string) {
 // document, replacing the blank Untitled tab NewModel already created —
 // unlike openFrom, which always adds a new tab. Failure just leaves the
 // blank tab in place with an error status, rather than refusing to start.
+//
+// If path doesn't exist yet, it's treated as a new-file target: rather
+// than erroring out immediately, the user is asked to confirm before the
+// blank tab gets bound to that path (so a typo doesn't silently start
+// creating a file at an unintended location).
 func (m *Model) openInitialFile(path string) {
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		m.mode = modeConfirmNewFile
+		m.pendingNewPath = path
+		return
+	}
 	d, err := LoadDocument(path)
 	if err != nil {
 		m.status = fmt.Sprintf("open failed: %v", err)
@@ -359,6 +371,14 @@ func (m *Model) openInitialFile(path string) {
 	m.tabs[0] = d
 	m.active = 0
 	m.status = "opened " + path
+	m.rememberFile(path)
+}
+
+// newFileAt binds the current tab's Path to path without loading anything,
+// so the next save writes a brand-new file there.
+func (m *Model) newFileAt(path string) {
+	m.tabs[0].Path = path
+	m.status = "new file " + path
 	m.rememberFile(path)
 }
 

@@ -146,6 +146,7 @@ const (
 	modePromptOpen
 	modeConfirmClose
 	modeConfirmClear
+	modeConfirmNewFile
 	modeColorPicker
 	modeNumberEntry
 )
@@ -168,6 +169,7 @@ type Model struct {
 	mode            mode
 	input           textinput.Model
 	pendingCloseIdx int
+	pendingNewPath  string
 
 	// drag state for the tool currently being dragged with the mouse
 	dragging      bool
