@@ -309,10 +309,7 @@ func (m Model) canvasRaster(cols, rows int, d *Document, offset Point, zoom floa
 		return r
 	}
 
-	if d.fillCache == nil {
-		d.fillCache = FillBoundCache{}
-	}
-	r := RasterizeDocument(d.Edits, cols, rows, offset.X, offset.Y, zoom, selectColor, m.hoverEditID, hoverEditColor, d.fillCache, d.Version)
+	r := RasterizeDocument(d.Edits, cols, rows, offset.X, offset.Y, zoom, selectColor, m.hoverEditID, hoverEditColor)
 	dragEditID, dragPointsBaked := 0, 0
 	var baseRaster *Raster
 	baseEditID, baseVer := 0, 0
@@ -320,7 +317,7 @@ func (m Model) canvasRaster(cols, rows int, d *Document, offset Point, zoom floa
 		dragEditID, dragPointsBaked = m.dragEdit.ID, len(m.dragEdit.Points)
 	}
 	if m.dragging && isShapeDragTool(m.tool) && m.dragEdit != nil {
-		baseRaster = RasterizeDocument(withoutEdit(d.Edits, m.dragEdit.ID), cols, rows, offset.X, offset.Y, zoom, selectColor, m.hoverEditID, hoverEditColor, d.fillCache, d.Version)
+		baseRaster = RasterizeDocument(withoutEdit(d.Edits, m.dragEdit.ID), cols, rows, offset.X, offset.Y, zoom, selectColor, m.hoverEditID, hoverEditColor)
 		baseEditID, baseVer = m.dragEdit.ID, d.Version
 	}
 	*c = canvasCache{

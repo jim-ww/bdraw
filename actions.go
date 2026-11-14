@@ -225,10 +225,7 @@ func (m *Model) doPaste() {
 		e := src.Clone()
 		e.ID = d.NextID()
 		e.Selected = true
-		for i := range e.Points {
-			e.Points[i].X += pasteOffset
-			e.Points[i].Y += pasteOffset
-		}
+		e.Translate(pasteOffset, pasteOffset)
 		d.Edits = append(d.Edits, e)
 	}
 	m.tool = ToolMove

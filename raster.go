@@ -68,22 +68,6 @@ func (r *Raster) clone() *Raster {
 	return &Raster{Cols: r.Cols, Rows: r.Rows, cells: cells}
 }
 
-// fillBoundEntry is one cached isFillBounded verdict, tagged with the
-// document version it was computed against.
-type fillBoundEntry struct {
-	ver     int
-	bounded bool
-}
-
-// FillBoundCache memoizes isFillBounded per fill edit, keyed by document
-// version. isFillBounded is independent of the viewport, but panning or
-// zooming still forces a full RasterizeDocument every frame (the render
-// cache keys off viewport state too — see canvasRaster) — without this,
-// every fill on the canvas re-probed the entire document on every single
-// pan/zoom tick, which is what made scrolling a canvas with more than a
-// few fills visibly lag (see BenchmarkRasterizeDocumentWithFills).
-type FillBoundCache map[int]fillBoundEntry
-
 // RasterizeDocument draws edits into a Cols x Rows grid. (ox, oy) is the
 // world coordinate at the viewport's top-left and zoom is world-to-screen
 // scale (subpixels of screen per subpixel of world).
@@ -92,14 +76,9 @@ type FillBoundCache map[int]fillBoundEntry
 // used for the move/eraser tools' hover highlight — the same way a
 // Selected edit is recolored with selectColor.
 //
-// Fill edits are applied in a second pass, after every other edit, since a
-// flood fill needs the full set of ink boundaries already in place to know
-// where to stop.
-//
-// cache and ver together memoize each fill's boundedness check across
-// calls that share the same document version; cache may be nil to skip
-// memoization (e.g. a one-off export).
-func RasterizeDocument(edits []*Edit, cols, rows int, ox, oy, zoom float64, selectColor string, highlightID int, highlightColor string, cache FillBoundCache, ver int) *Raster {
+// Fill edits paint cell backgrounds from their stored area (see
+// FillArea), so ink drawn later still shows on top of them.
+func RasterizeDocument(edits []*Edit, cols, rows int, ox, oy, zoom float64, selectColor string, highlightID int, highlightColor string) *Raster {
 	r := &Raster{Cols: cols, Rows: rows, cells: make([]cell, cols*rows)}
 	pick := func(e *Edit) string {
 		switch {
@@ -111,168 +90,17 @@ func RasterizeDocument(edits []*Edit, cols, rows int, ox, oy, zoom float64, sele
 			return e.Color
 		}
 	}
-	var fills []*Edit
-	var nonFills []*Edit
 	for _, e := range edits {
-		if e.Kind == KindFill {
-			fills = append(fills, e)
-			continue
+		if e.Kind == KindFill && e.Area != nil {
+			r.paintArea(e.Area, ox, oy, zoom, pick(e))
 		}
-		nonFills = append(nonFills, e)
-		r.drawEdit(e, ox, oy, zoom, pick(e))
 	}
-	for _, e := range fills {
-		if len(e.Points) == 0 {
-			continue
-		}
-		// Re-validate boundedness on every render, not just at creation:
-		// the enclosing shape can be edited or deleted after the fill
-		// exists. This has to be independent of the current viewport (see
-		// isFillBounded) — checking against the visible raster itself is
-		// exactly the bug that made a valid fill disappear on zoom.
-		bounded, ok := false, false
-		if cache != nil {
-			if entry, hit := cache[e.ID]; hit && entry.ver == ver {
-				bounded, ok = entry.bounded, true
-			}
-		}
-		if !ok {
-			bounded = isFillBounded(nonFills, e.Points[0])
-			if cache != nil {
-				cache[e.ID] = fillBoundEntry{ver: ver, bounded: bounded}
-			}
-		}
-		if bounded {
-			r.floodFill(e, ox, oy, zoom, pick(e))
+	for _, e := range edits {
+		if e.Kind != KindFill {
+			r.drawEdit(e, ox, oy, zoom, pick(e))
 		}
 	}
 	return r
-}
-
-// fillProbeCols/fillProbeRows is the fixed cell budget spent on every
-// boundedness check. fillProbeLevels are the (radius, zoom) windows tried,
-// finest first: a single fixed-radius coarse probe (the original design)
-// resolved a distant boundary fine, but for a small shape — the common
-// case, since most drawings are far smaller than the world — its cells
-// were wider than the whole shape, so the seed and the enclosing ink could
-// land in the very same cell and the flood couldn't even get started (see
-// isFillBounded). Starting fine and only widening the window when the
-// flood actually runs off the edge of it gives small shapes the
-// resolution they need while still falling back to the old coarse, wide
-// probe for shapes bigger than the fine window.
-var fillProbeLevels = [...]struct {
-	radius, zoom float64
-}{
-	{radius: 128, zoom: 1},
-	{radius: 2048, zoom: 0.125},
-}
-
-// isFillBounded reports whether a flood fill seeded at p is enclosed by ink
-// from edits, regardless of the current viewport.
-func isFillBounded(edits []*Edit, p Point) bool {
-	for _, lvl := range fillProbeLevels {
-		ox, oy := p.X-lvl.radius, p.Y-lvl.radius
-		probe := &Raster{Cols: fillProbeCols, Rows: fillProbeRows, cells: make([]cell, fillProbeCols*fillProbeRows)}
-		for _, e := range edits {
-			probe.drawEdit(e, ox, oy, lvl.zoom, e.Color)
-		}
-		col := int(((p.X - ox) * lvl.zoom) / SubpixW)
-		row := int(((p.Y - oy) * lvl.zoom) / SubpixH)
-		cells, touchesEdge := probe.floodRegion(col, row)
-		// touchesEdge means the flood ran off this window without finding
-		// enclosing ink — could be genuinely open, or could just mean the
-		// shape is bigger than this window. Escalate to the next, wider
-		// level rather than concluding either way.
-		if touchesEdge {
-			continue
-		}
-		// len(cells) == 0 means the seed's own probe cell already reads as
-		// ink, so floodRegion never even started — that's not necessarily
-		// because the seed is genuinely on a line: the probe cell can
-		// cover a wide swath of world space, so a seed a few world units
-		// outside a thin wall can land in the very same cell as that
-		// wall's dot and read as solid. Reading that as "bounded" was the
-		// actual bug: it let a click just outside an object's edge — the
-		// extremely common case of zooming in close to something and
-		// clicking just past its border — create a fill that, rendered at
-		// real resolution where the seed truly is empty, had nothing
-		// stopping it and flooded the whole open background. Treat "the
-		// probe couldn't even start" as unknown and escalate, rather than
-		// as safe.
-		if len(cells) > 0 {
-			return true
-		}
-	}
-	return false
-}
-
-const fillProbeCols, fillProbeRows = 256, 128
-
-type gridCoord struct{ col, row int }
-
-// floodRegion walks every empty cell reachable from (col, row) without
-// crossing ink, 4-directionally. touchesEdge reports whether the region
-// reached the viewport boundary rather than being fully enclosed by ink —
-// i.e. whether this is (as far as the current viewport can tell) open
-// background rather than a closed shape.
-func (r *Raster) floodRegion(col, row int) (cells []gridCoord, touchesEdge bool) {
-	if col < 0 || col >= r.Cols || row < 0 || row >= r.Rows {
-		return nil, true
-	}
-	if !r.at(col, row).empty() {
-		return nil, false
-	}
-
-	queue := []gridCoord{{col, row}}
-	visited := map[gridCoord]bool{{col, row}: true}
-	for len(queue) > 0 {
-		c := queue[0]
-		queue = queue[1:]
-		if c.col == 0 || c.col == r.Cols-1 || c.row == 0 || c.row == r.Rows-1 {
-			touchesEdge = true
-		}
-		cells = append(cells, c)
-		for _, d := range [4]gridCoord{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
-			n := gridCoord{c.col + d.col, c.row + d.row}
-			if n.col < 0 || n.col >= r.Cols || n.row < 0 || n.row >= r.Rows {
-				touchesEdge = true
-				continue
-			}
-			if visited[n] {
-				continue
-			}
-			visited[n] = true
-			if r.at(n.col, n.row).empty() {
-				queue = append(queue, n)
-			}
-		}
-	}
-	return cells, touchesEdge
-}
-
-// floodFill paints the background of every empty cell reachable from e's
-// seed point without crossing ink. It silently no-ops on an open region —
-// callers should reject that at fill-creation time (see mouse.go) so the
-// edit never gets added in the first place; this is just a safety net if
-// the viewport boundaries have shifted since.
-func (r *Raster) floodFill(e *Edit, ox, oy, zoom float64, color string) {
-	if len(e.Points) == 0 {
-		return
-	}
-	p := e.Points[0]
-	col := int(((p.X - ox) * zoom) / SubpixW)
-	row := int(((p.Y - oy) * zoom) / SubpixH)
-	// touchesEdge is deliberately ignored here: it's only meaningful at
-	// creation time (see mouse.go), where it's checked against the
-	// viewport the user actually clicked in. At render time, "the flood
-	// reaches the current viewport's edge" is completely expected and
-	// correct once you've zoomed in past the shape's boundary — the
-	// enclosing ink is simply off-screen, not gone. Aborting the paint
-	// here made a valid fill vanish the moment you zoomed in far enough.
-	cells, _ := r.floodRegion(col, row)
-	for _, c := range cells {
-		r.at(c.col, c.row).bg = color
-	}
 }
 
 // maxScreenSize is a pure anti-overflow guard, not a visual clamp: it only

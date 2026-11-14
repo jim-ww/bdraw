@@ -40,6 +40,10 @@ type Edit struct {
 	// needs to mean anything else, which avoids a file-format migration.
 	Hardness float64 `json:"hardness,omitempty"`
 
+	// Area is the region a fill edit paints, computed when the fill is
+	// made. Fills from files saved before it existed get one on load.
+	Area *FillArea `json:"area,omitempty"`
+
 	// Selected is UI-only state (select tool) and is never persisted.
 	Selected bool `json:"-"`
 }
@@ -57,5 +61,21 @@ func (e *Edit) hardness() float64 {
 func (e *Edit) Clone() *Edit {
 	c := *e
 	c.Points = append([]Point(nil), e.Points...)
+	if e.Area != nil {
+		a := *e.Area
+		c.Area = &a
+	}
 	return &c
+}
+
+// Translate moves e by (dx, dy).
+func (e *Edit) Translate(dx, dy float64) {
+	for i := range e.Points {
+		e.Points[i].X += dx
+		e.Points[i].Y += dy
+	}
+	if e.Area != nil {
+		e.Area.Origin.X += dx
+		e.Area.Origin.Y += dy
+	}
 }

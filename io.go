@@ -34,6 +34,7 @@ func LoadDocument(path string) (*Document, error) {
 	d := NewDocument()
 	d.Path = path
 	d.Edits = f.Edits
+	bakeFills(d.Edits)
 	for _, e := range d.Edits {
 		if e.ID > d.nextID {
 			d.nextID = e.ID

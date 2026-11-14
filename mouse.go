@@ -269,12 +269,13 @@ func (m *Model) toolDown(pt Point) (tea.Model, tea.Cmd) {
 		}
 
 	case ToolFill:
-		if !isFillBounded(d.Edits, pt) {
+		area := fillAreaAt(d.Edits, pt)
+		if area == nil {
 			m.status = "fill needs an enclosed area"
 			return *m, nil
 		}
 		d.BeginChange()
-		e := &Edit{ID: d.NextID(), Kind: KindFill, Points: []Point{pt}, Color: m.color}
+		e := &Edit{ID: d.NextID(), Kind: KindFill, Points: []Point{pt}, Color: m.color, Area: area}
 		d.Edits = append(d.Edits, e)
 
 	case ToolText:
@@ -351,10 +352,7 @@ func (m *Model) toolDrag(pt Point, constrain bool) (tea.Model, tea.Cmd) {
 	case ToolMove:
 		dx, dy := pt.X-m.moveLast.X, pt.Y-m.moveLast.Y
 		for _, e := range m.moveTargets {
-			for i := range e.Points {
-				e.Points[i].X += dx
-				e.Points[i].Y += dy
-			}
+			e.Translate(dx, dy)
 		}
 		m.moveLast = pt
 		m.doc().Touch()
