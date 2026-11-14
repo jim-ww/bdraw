@@ -20,7 +20,7 @@
       {
         packages.default = pkgs.buildGoModule {
           pname = "bdraw";
-          version = "0.2.0";
+          version = "0.2.1";
           src = ./.;
 
           vendorHash = "sha256-UsvPBIPO8cLVmFbZUlueAuiMd5fEGSi6Omf6jTr64Wo=";
