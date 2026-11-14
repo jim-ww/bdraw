@@ -554,7 +554,9 @@ func (r *Raster) drawSegment(x0, y0, x1, y1, size, hardness float64, color strin
 	// coreRadius == radius, so this is exactly the original formula.
 	coreRadius := (size / 2) * hardness / 100
 	spacing := math.Max(coreRadius, 1) // never coarser than 1 subpixel, so thin strokes are unaffected
-	steps := int(length / spacing)
+	// Rounding up keeps stamps at most spacing apart, so thin lines have no
+	// one-dot gaps for a fill to leak through.
+	steps := int(math.Ceil(length / spacing))
 	if steps < 1 {
 		steps = 1
 	}
